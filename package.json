@@ -1,6 +1,6 @@
 {
   "name": "moewki",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Cartoon desktop cats that play on your windows (Windows and macOS)",
   "main": "main.js",
   "scripts": {
