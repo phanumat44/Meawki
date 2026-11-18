@@ -154,6 +154,13 @@ ipcMain.on('window', (e, action) => {
   if (action === 'minimize') w?.minimize();
 });
 
+// One Moewki at a time: launching it again just opens the settings of the copy that is running.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
+app.on('second-instance', () => openSettings());
+
 if (IS_MAC) app.dock?.hide(); // a menu bar app: no Dock icon while only the cats are showing
 
 app.whenReady().then(() => {
