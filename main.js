@@ -3,15 +3,21 @@ const path = require('path');
 const fs = require('fs');
 
 const IS_MAC = process.platform === 'darwin';
-const { listWindows } = IS_MAC ? require('./macapi') : require('./winapi');
+const winapi = IS_MAC ? require('./macapi') : require('./winapi');
+const { listWindows } = winapi;
+const HIDE_SHORTCUT = 'Control+Alt+H'; // Ctrl+Option+H on macOS (Cmd+Option+H is "hide others" there)
 
-let overlay, tray, pollTimer, settingsWin;
+let overlay, tray, pollTimer, fullscreenTimer, settingsWin;
+let hiddenByFullscreen = false;
 
 // --- settings, saved in the user's app data folder ---
 const DEFAULTS = {
   cats: [{ id: 'c1', coat: 'orange' }],
   hop: true, sleepOnWindows: true, offscreen: true, taskbar: true, speed: 1, size: 1,
+  autoHide: true, hideFromCapture: true,
 };
+// live state shown in the settings window but never written to settings.json
+const TRANSIENT = ['hidden', 'launchAtLogin'];
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 let settings = { ...DEFAULTS };
 function loadSettings() {
@@ -21,21 +27,26 @@ function loadSettings() {
   if (!TRAY_TEXT[settings.lang]) settings.lang = app.getPreferredSystemLanguages()[0]?.startsWith('th') ? 'th' : 'en';
 }
 function saveSettings() {
-  try { fs.writeFileSync(settingsFile(), JSON.stringify(settings, null, 2)); } catch (e) { console.warn('could not save settings', e); }
+  const saved = { ...settings };
+  for (const k of TRANSIENT) delete saved[k];
+  try { fs.writeFileSync(settingsFile(), JSON.stringify(saved, null, 2)); } catch (e) { console.warn('could not save settings', e); }
 }
 function broadcastSettings() {
-  for (const w of [overlay, settingsWin]) if (w && !w.isDestroyed()) w.webContents.send('settings', settings);
+  const live = { ...settings, launchAtLogin: launchesAtLogin() };
+  for (const w of [overlay, settingsWin]) if (w && !w.isDestroyed()) w.webContents.send('settings', live);
 }
 
 const TRAY_TEXT = {
-  th: { settings: 'การตั้งค่า…', recall: 'เรียกแมวกลับมา', nap: 'ให้แมวนอน', quit: 'ออกจาก Moewki' },
-  en: { settings: 'Settings…', recall: 'Call cats back', nap: 'Nap time', quit: 'Quit Moewki' },
+  th: { settings: 'การตั้งค่า…', hide: 'ซ่อนแมว', recall: 'เรียกแมวกลับมา', nap: 'ให้แมวนอน', quit: 'ออกจาก Moewki' },
+  en: { settings: 'Settings…', hide: 'Hide cats', recall: 'Call cats back', nap: 'Nap time', quit: 'Quit Moewki' },
 };
 function buildTrayMenu() {
   const tx = TRAY_TEXT[settings.lang] ?? TRAY_TEXT.en;
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: tx.settings, accelerator: IS_MAC ? 'Command+,' : undefined, click: openSettings },
     { type: 'separator' },
+    { label: tx.hide, type: 'checkbox', checked: !!settings.hidden, accelerator: HIDE_SHORTCUT, registerAccelerator: false,
+      click: (item) => setHidden(item.checked) },
     { label: tx.recall, click: () => overlay.webContents.send('command', 'recall') },
     { label: tx.nap, click: () => overlay.webContents.send('command', 'sleep') },
     { type: 'separator' },
@@ -72,6 +83,50 @@ function openSettings() {
   settingsWin.on('closed', () => { if (IS_MAC) app.dock?.hide(); });
 }
 
+// --- login item ---
+// A packaged app registers itself; during development it is electron.exe plus this folder.
+const loginItem = () => (app.isPackaged ? {} : { path: process.execPath, args: [path.resolve(__dirname)] });
+const launchesAtLogin = () => app.getLoginItemSettings(loginItem()).openAtLogin;
+function setLaunchAtLogin(on) {
+  app.setLoginItemSettings({ openAtLogin: on, ...loginItem() });
+}
+
+// --- hiding the cats ---
+// The overlay is hidden while the user asked for it (tray, shortcut) or while something runs full screen.
+function setHidden(on) {
+  settings.hidden = on;
+  applyVisibility();
+  broadcastSettings();
+  buildTrayMenu();
+}
+
+function applyVisibility() {
+  if (!overlay || overlay.isDestroyed()) return;
+  const show = !settings.hidden && !hiddenByFullscreen;
+  if (show && !overlay.isVisible()) {
+    overlay.showInactive(); // never take focus from what the user is doing
+    overlay.setAlwaysOnTop(true, 'screen-saver');
+  } else if (!show && overlay.isVisible()) {
+    overlay.hide();
+  }
+}
+
+function fullscreenNow() {
+  if (!IS_MAC) return winapi.isFullscreenBusy();
+  // macOS: the frontmost app window fills a whole display (a full-screen Space)
+  const front = listWindows()[0];
+  return !!front && screen.getAllDisplays().some(({ bounds: d }) =>
+    front.x <= d.x && front.y <= d.y && front.x + front.w >= d.x + d.width && front.y + front.h >= d.y + d.height);
+}
+
+function watchFullscreen() {
+  clearInterval(fullscreenTimer);
+  fullscreenTimer = setInterval(() => {
+    const busy = settings.autoHide && fullscreenNow();
+    if (busy !== hiddenByFullscreen) { hiddenByFullscreen = busy; applyVisibility(); }
+  }, 500);
+}
+
 // macOS: the user's accent colour. Elsewhere the page uses the standard macOS blue.
 function accentColor() {
   if (!IS_MAC) return null;
@@ -95,6 +150,7 @@ function createOverlay() {
   });
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.setIgnoreMouseEvents(true, { forward: true });
+  overlay.setContentProtection(!!settings.hideFromCapture); // keep cats out of screen shares and recordings
   if (IS_MAC) {
     overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     overlay.setBounds(b); // macOS may nudge a window below the menu bar on creation
@@ -117,7 +173,7 @@ function createOverlay() {
 }
 
 function sendWorld(exclude) {
-  if (!overlay || overlay.isDestroyed() || overlay.webContents.isDestroyed()) return;
+  if (!overlay || overlay.isDestroyed() || overlay.webContents.isDestroyed() || !overlay.isVisible()) return;
   const display = screen.getPrimaryDisplay();
   const b = display.bounds;
   const windows = listWindows(exclude).map((w) => {
@@ -138,13 +194,17 @@ function sendWorld(exclude) {
 ipcMain.on('set-ignore-mouse', (_e, ignore) => {
   if (overlay && !overlay.isDestroyed()) overlay.setIgnoreMouseEvents(ignore, { forward: true });
 });
-ipcMain.handle('settings:get', () => settings);
+ipcMain.handle('settings:get', () => ({ ...settings, launchAtLogin: launchesAtLogin() }));
 ipcMain.handle('system:accent', accentColor);
 ipcMain.on('settings:set', (_e, patch) => {
+  if ('launchAtLogin' in patch) setLaunchAtLogin(patch.launchAtLogin);
+  if ('hidden' in patch) return setHidden(patch.hidden);
   settings = { ...settings, ...patch };
   saveSettings();
   broadcastSettings();
   if ('lang' in patch) buildTrayMenu();
+  if ('hideFromCapture' in patch) overlay.setContentProtection(!!patch.hideFromCapture);
+  if ('autoHide' in patch && !patch.autoHide) { hiddenByFullscreen = false; applyVisibility(); }
 });
 ipcMain.on('command', (_e, c) => overlay?.webContents.send('command', c));
 // title bar buttons drawn by the settings page on Windows
@@ -174,11 +234,15 @@ app.whenReady().then(() => {
     if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('accent', accentColor());
   });
   if (process.argv.includes('--settings')) openSettings();
-  globalShortcut.register('CommandOrControl+Alt+Q', () => app.quit());
+  watchFullscreen();
+  const shortcuts = { 'CommandOrControl+Alt+Q': () => app.quit(), [HIDE_SHORTCUT]: () => setHidden(!settings.hidden) };
+  for (const [keys, fn] of Object.entries(shortcuts)) {
+    if (!globalShortcut.register(keys, fn)) console.warn(`shortcut ${keys} is taken by another app`);
+  }
   screen.on('display-metrics-changed', () => overlay.setBounds(overlayBounds()));
 });
 
 // closing the settings window must not quit the app
 app.on('window-all-closed', (e) => e.preventDefault?.());
-app.on('before-quit', () => clearInterval(pollTimer));
+app.on('before-quit', () => { clearInterval(pollTimer); clearInterval(fullscreenTimer); });
 app.on('will-quit', () => globalShortcut.unregisterAll());

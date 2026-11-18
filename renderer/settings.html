@@ -207,8 +207,18 @@
           <div class="row"><span class="label"><span data-i18n="language"></span><span class="desc" data-i18n="languageDesc"></span></span>
             <span class="popup"><select id="lang"></select><span class="arrows"></span></span></div>
         </div>
+        <h2 data-i18n="startup"></h2>
+        <div class="group">
+          <div class="row"><span class="label"><span data-i18n="launchAtLogin"></span><span class="desc" data-i18n="launchAtLoginDesc"></span></span><input type="checkbox" class="switch" data-key="launchAtLogin"></div>
+        </div>
+        <h2 data-i18n="privacy"></h2>
+        <div class="group">
+          <div class="row"><span class="label"><span data-i18n="autoHide"></span><span class="desc" data-i18n="autoHideDesc"></span></span><input type="checkbox" class="switch" data-key="autoHide"></div>
+          <div class="row"><span class="label"><span data-i18n="hideFromCapture"></span><span class="desc" data-i18n="hideFromCaptureDesc"></span></span><input type="checkbox" class="switch" data-key="hideFromCapture"></div>
+        </div>
         <h2 data-i18n="actions"></h2>
         <div class="group">
+          <div class="row"><span class="label"><span data-i18n="hidden"></span><span class="desc" id="hiddenDesc"></span></span><input type="checkbox" class="switch" data-key="hidden"></div>
           <div class="row"><span class="label"><span data-i18n="recall"></span><span class="desc" data-i18n="recallDesc"></span></span><button class="btn" id="recall" data-i18n="recallBtn"></button></div>
           <div class="row"><span class="label"><span data-i18n="nap"></span><span class="desc" data-i18n="napDesc"></span></span><button class="btn" id="nap" data-i18n="napBtn"></button></div>
         </div>
@@ -372,6 +382,7 @@ function applyLanguage() {
   setLanguage(appliedLang);
   document.documentElement.lang = appliedLang;
   for (const node of document.querySelectorAll('[data-i18n]')) node.textContent = t(node.dataset.i18n);
+  $('#hiddenDesc').textContent = t('hiddenDesc', platform === 'mac' ? '⌃⌥H' : 'Ctrl+Alt+H');
   $('#title').textContent = t(page);
   renderCats();
 }

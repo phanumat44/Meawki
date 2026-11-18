@@ -3,6 +3,7 @@ const koffi = require('koffi');
 
 const user32 = koffi.load('user32.dll');
 const dwmapi = koffi.load('dwmapi.dll');
+const shell32 = koffi.load('shell32.dll');
 
 const EnumWindowsProc = koffi.proto('bool __stdcall EnumWindowsProc(void *hwnd, intptr_t lParam)');
 const EnumWindows = user32.func('bool __stdcall EnumWindows(EnumWindowsProc *cb, intptr_t lParam)');
@@ -12,6 +13,13 @@ const GetWindowTextW = user32.func('int __stdcall GetWindowTextW(void *hwnd, _Ou
 const GetClassNameW = user32.func('int __stdcall GetClassNameW(void *hwnd, _Out_ uint8_t *buf, int max)');
 const GetWindowLongPtrW = user32.func('intptr_t __stdcall GetWindowLongPtrW(void *hwnd, int index)');
 const DwmGetWindowAttribute = dwmapi.func('long __stdcall DwmGetWindowAttribute(void *hwnd, uint32_t attr, _Out_ uint8_t *pv, uint32_t cb)');
+const GetForegroundWindow = user32.func('void * __stdcall GetForegroundWindow()');
+const IsZoomed = user32.func('bool __stdcall IsZoomed(void *hwnd)');
+const MonitorFromWindow = user32.func('void * __stdcall MonitorFromWindow(void *hwnd, uint32_t flags)');
+const RECT = koffi.struct('RECT', { left: 'long', top: 'long', right: 'long', bottom: 'long' });
+const MONITORINFO = koffi.struct('MONITORINFO', { cbSize: 'uint32_t', rcMonitor: RECT, rcWork: RECT, dwFlags: 'uint32_t' });
+const GetMonitorInfoW = user32.func('bool __stdcall GetMonitorInfoW(void *monitor, _Inout_ MONITORINFO *info)');
+const SHQueryUserNotificationState = shell32.func('long __stdcall SHQueryUserNotificationState(_Out_ int *state)');
 
 const GWL_EXSTYLE = -20;
 const WS_EX_TOOLWINDOW = 0x80;
@@ -55,4 +63,23 @@ function listWindows(excludeIds = new Set()) {
   return out;
 }
 
-module.exports = { listWindows };
+// QUNS_BUSY (full-screen app), QUNS_RUNNING_D3D_FULL_SCREEN (game), QUNS_PRESENTATION_MODE
+const BUSY_STATES = new Set([2, 3, 4]);
+const MONITOR_DEFAULTTONEAREST = 2;
+
+// True while something full screen is in front: a game, a presentation, or a window (video, F11 browser)
+// that covers its whole monitor without being merely maximized.
+function isFullscreenBusy() {
+  const state = [0];
+  if (SHQueryUserNotificationState(state) === 0 && BUSY_STATES.has(state[0])) return true;
+  const fg = GetForegroundWindow();
+  if (!fg || IsZoomed(fg) || IGNORED_CLASSES.has(readWStr(GetClassNameW, fg))) return false;
+  if (DwmGetWindowAttribute(fg, DWMWA_EXTENDED_FRAME_BOUNDS, rectBuf, 16) !== 0) return false;
+  const info = { cbSize: koffi.sizeof(MONITORINFO) };
+  if (!GetMonitorInfoW(MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST), info)) return false;
+  const m = info.rcMonitor;
+  return rectBuf.readInt32LE(0) <= m.left && rectBuf.readInt32LE(4) <= m.top
+    && rectBuf.readInt32LE(8) >= m.right && rectBuf.readInt32LE(12) >= m.bottom;
+}
+
+module.exports = { listWindows, isFullscreenBusy };
