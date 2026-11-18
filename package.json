@@ -32,6 +32,11 @@
     "directories": {
       "output": "dist"
     },
+    "electronLanguages": [
+      "en-US",
+      "th"
+    ],
+    "compression": "maximum",
     "files": [
       "main.js",
       "preload.js",
@@ -43,6 +48,7 @@
       "assets/**",
       "!assets/icon-src/**",
       "!assets/icon-1024.png",
+      "!**/*.map",
       "package.json",
       "LICENSE"
     ],
