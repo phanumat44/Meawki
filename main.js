@@ -20,9 +20,10 @@ let catOwners = new Map();  // cat id -> display id
 
 // --- settings, saved in the user's app data folder ---
 const DEFAULTS = {
-  cats: [{ id: 'c1', coat: 'orange' }],
+  cats: [{ id: 'c1', name: 'ส้มจี๊ด', coat: 'orange', personality: 'normal' }],
   hop: true, sleepOnWindows: true, offscreen: true, taskbar: true, speed: 1, size: 1,
   autoHide: true, hideFromCapture: true,
+  sound: true, volume: 0.8, timeOfDay: true,
 };
 // live state shown in the settings window but never written to settings.json
 const TRANSIENT = ['hidden', 'launchAtLogin'];

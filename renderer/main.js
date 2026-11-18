@@ -25,10 +25,32 @@ function fx(text, pos, cls) {
   setTimeout(() => el.remove(), 1900);
 }
 
+// sound effects synthesized via ElevenLabs
+const AUDIO = {
+  meow1: new Audio('../assets/sounds/meow1.mp3'),
+  meow2: new Audio('../assets/sounds/meow2.mp3'),
+  purr: new Audio('../assets/sounds/purr.mp3'),
+  hiss: new Audio('../assets/sounds/hiss.mp3'),
+  pounce: new Audio('../assets/sounds/pounce.mp3'),
+};
+
+function playSound(name) {
+  if (settings.sound === false) return;
+  const soundName = name === 'meow' ? (Math.random() < 0.5 ? 'meow1' : 'meow2') : name;
+  const audio = AUDIO[soundName];
+  if (!audio) return;
+  try {
+    const clone = audio.cloneNode();
+    clone.volume = Math.max(0, Math.min(1, settings.volume ?? 0.8));
+    clone.play().catch(() => {});
+  } catch {}
+}
+
 const world = new World();
 let settings = {
-  cats: [{ id: 'c1', coat: 'orange' }],
+  cats: [{ id: 'c1', name: 'ส้มจี๊ด', coat: 'orange', personality: 'normal' }],
   hop: true, sleepOnWindows: true, offscreen: true, taskbar: true, speed: 1, size: 1,
+  sound: true, volume: 0.8, timeOfDay: true,
 };
 const pets = []; // { id, coat, brain, cat }
 const arrivals = new Map(); // cat id -> edge it walks in from, for cats coming from another display
@@ -53,6 +75,9 @@ function syncPets() {
       pets.push(pet);
     }
     pet.coat = pet.cat.coat = c.coat;
+    pet.brain.name = c.name || '';
+    pet.brain.personality = c.personality || 'normal';
+    pet.brain.sound = playSound;
     pet.brain.prefs = settings;
     pet.brain.size = catSize();
   }

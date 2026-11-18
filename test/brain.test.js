@@ -158,3 +158,31 @@ test('Brain enterFrom positions cat at specified display border', () => {
   assert.equal(brain.dir, -1);
   assert.equal(brain.surf, 'floor');
 });
+
+test('Brain sound triggers on pet and landing', () => {
+  const world = new World();
+  const sounds = [];
+  const brain = new Brain(world, () => {}, { w: 60, h: 40 });
+  brain.sound = (type) => sounds.push(type);
+
+  brain.surf = 'floor';
+  brain.mode = 'idle';
+  brain.pet();
+  assert.ok(sounds.includes('purr'), 'Petting cat should trigger purr sound');
+
+  sounds.length = 0;
+  brain.afterLanding();
+  assert.ok(sounds.includes('pounce'), 'Landing should trigger pounce sound');
+});
+
+test('Timid cat personality triggers hiss on grab', () => {
+  const world = new World();
+  const sounds = [];
+  const brain = new Brain(world, () => {}, { w: 60, h: 40 });
+  brain.sound = (type) => sounds.push(type);
+  brain.personality = 'timid';
+
+  brain.grab();
+  assert.ok(sounds.includes('hiss'), 'Timid cat should hiss when grabbed');
+});
+

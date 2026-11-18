@@ -22,7 +22,11 @@ const STRINGS = {
     addDesc: (max) => `เลี้ยงได้สูงสุด ${max} ตัว`,
     addFull: (max) => `มีแมวครบ ${max} ตัวแล้ว`,
     coats: { orange: 'ส้ม', calico: 'สามสี', grey: 'เทาลาย', black: 'ดำ', white: 'ขาว', siamese: 'วิเชียรมาศ', tuxedo: 'ทักซิโด้' },
-    general: 'ทั่วไป', breed: 'สายพันธุ์',
+    personalities: { normal: 'ปกติ', lazy: 'ขี้เกียจ', hyper: 'ซน', timid: 'ขี้กลัว' },
+    general: 'ทั่วไป', breed: 'สายพันธุ์', personality: 'นิสัย', catName: 'ชื่อ',
+    sound: 'เสียง', soundEffects: 'เสียงเอฟเฟกต์', soundEffectsDesc: 'เสียงร้องเหมียว, เสียงเพอร์เมื่อลูบหัว, เสียงขู่',
+    volume: 'ระดับเสียง', mute: 'เบา', loud: 'ดัง',
+    timeOfDay: 'ตามเวลาของวัน', timeOfDayDesc: 'กลางคืนจะนอนบ่อยขึ้น ตอนเช้าจะตื่นมาวิ่งเล่น',
     addTip: 'เพิ่มแมว', removeTip: 'นำแมวที่เลือกออก',
     slow: 'ช้า', fast: 'เร็ว', small: 'เล็ก', large: 'ใหญ่',
     updates: 'อัปเดต',
@@ -72,7 +76,11 @@ const STRINGS = {
     addDesc: (max) => `Up to ${max} cats`,
     addFull: (max) => `You have the maximum of ${max} cats`,
     coats: { orange: 'Orange tabby', calico: 'Calico', grey: 'Grey tabby', black: 'Black', white: 'White', siamese: 'Siamese', tuxedo: 'Tuxedo' },
-    general: 'General', breed: 'Breed',
+    personalities: { normal: 'Balanced', lazy: 'Lazy', hyper: 'Hyper', timid: 'Timid' },
+    general: 'General', breed: 'Breed', personality: 'Personality', catName: 'Name',
+    sound: 'Sound', soundEffects: 'Sound effects', soundEffectsDesc: 'Cute meows, purring when petted, and hissing',
+    volume: 'Volume', mute: 'Quiet', loud: 'Loud',
+    timeOfDay: 'Follow time of day', timeOfDayDesc: 'Sleep more at night, active zoomies in the morning',
     addTip: 'Add a cat', removeTip: 'Remove the selected cat',
     slow: 'Slow', fast: 'Fast', small: 'Small', large: 'Large',
     updates: 'Updates',
@@ -112,3 +120,4 @@ export function t(key, ...args) {
   return typeof v === 'function' ? v(...args) : v;
 }
 export const coatName = (key) => STRINGS[current].coats[key] ?? key;
+export const personalityName = (key) => STRINGS[current].personalities?.[key] ?? key;

@@ -71,6 +71,9 @@ export class Brain {
     this.world = world;
     this.fx = fx;
     this.size = size; // { w, h } of the cat on screen
+    this.sound = null;
+    this.personality = 'normal'; // 'normal' | 'lazy' | 'hyper' | 'timid'
+    this.name = '';
     this.x = world.width * 0.5; this.y = -80;
     this.vx = 0; this.vy = 0;
     this.dir = 1;
@@ -85,7 +88,7 @@ export class Brain {
     this.look = 0;           // head pitch toward a jump target, + = up
     this.fxTimer = 0;
     this.hidden = false;
-    this.prefs = { hop: true, sleepOnWindows: true, offscreen: true, taskbar: true };
+    this.prefs = { hop: true, sleepOnWindows: true, offscreen: true, taskbar: true, sound: true, timeOfDay: true };
   }
 
   get posture() { return POSTURE[this.mode] ?? 'stand'; }
@@ -230,15 +233,35 @@ export class Brain {
     // with taskbar walking off, a cat on the floor just looks for a way back up
     const roam = onWindow || pr.taskbar;
     const friend = this.nearestFriend();
-    const options = [['idle', 8], ['walk', roam ? 20 : 0], ['sit', 14], ['groom', 9], ['tuck', 7], ['yawn', 2],
-      ['sleep', onWindow ? (pr.sleepOnWindows ? 14 : 0) : (pr.taskbar ? 6 : 0)]];
-    if (jumps.length) options.push(['jump', roam ? 24 : 60]);
+
+    // personality and time-of-day multipliers
+    const pers = this.personality || 'normal';
+    const hour = new Date().getHours();
+    const isNight = pr.timeOfDay !== false && (hour >= 23 || hour < 6);
+    const isMorning = pr.timeOfDay !== false && (hour >= 6 && hour < 9);
+
+    const sleepMul = (pers === 'lazy' ? 2.5 : pers === 'hyper' ? 0.35 : 1) * (isNight ? 2.5 : 1);
+    const zoomMul = (pers === 'hyper' ? 2.5 : pers === 'lazy' ? 0.2 : 1) * (isMorning ? 2.0 : isNight ? 0.1 : 1);
+    const jumpMul = pers === 'hyper' ? 1.8 : pers === 'lazy' ? 0.4 : pers === 'timid' ? 0.5 : 1;
+    const walkMul = pers === 'lazy' ? 0.5 : pers === 'hyper' ? 1.4 : 1;
+    const groomMul = pers === 'lazy' ? 1.5 : 1;
+
+    const options = [
+      ['idle', 8],
+      ['walk', (roam ? 20 : 0) * walkMul],
+      ['sit', 14],
+      ['groom', 9 * groomMul],
+      ['tuck', 7 * sleepMul],
+      ['yawn', 2],
+      ['sleep', (onWindow ? (pr.sleepOnWindows ? 14 : 0) : (pr.taskbar ? 6 : 0)) * sleepMul],
+    ];
+    if (jumps.length) options.push(['jump', (roam ? 24 : 60) * jumpMul]);
     if (edge && onWindow) options.push(['lookdown', 12]);
     if (!onWindow && pr.taskbar) options.push(['exit', pr.offscreen ? 4 : 0], ['sniff', 6]);
     const next = this.world.neighbours ?? {};
     if (!onWindow && (next.left || next.right)) options.push(['visit', 4]); // wander over to the next screen
     if (friend) options.push(['greet', 9]);
-    if (seg.x2 - seg.x1 > 500 && roam) options.push(['zoomies', onWindow ? 1 : 2.5]);
+    if (seg.x2 - seg.x1 > 500 && roam) options.push(['zoomies', (onWindow ? 1 : 2.5) * zoomMul]);
 
     switch (pick(options)) {
       case 'idle': return this.set('idle', rand(1.5, 4));
@@ -273,9 +296,11 @@ export class Brain {
   // Cats turn around a couple of times, knead the spot, sit, and only then curl up.
   settleDown() {
     const d = this.dir;
+    const pers = this.personality || 'normal';
+    const sleepMul = pers === 'lazy' ? 1.8 : pers === 'hyper' ? 0.6 : 1;
     this.face(-d, () => this.face(d, () => {
       this.queue = () => {
-        this.queue = () => { this.fxTimer = 1.5; this.set('sleep', rand(20, 60)); };
+        this.queue = () => { this.fxTimer = 1.5; this.set('sleep', rand(20, 60) * sleepMul); };
         this.set('sit', rand(0.8, 1.5));
       };
       this.set('knead', rand(2, 3.5));
@@ -283,9 +308,14 @@ export class Brain {
   }
 
   afterLanding() {
+    this.sound?.('pounce');
     if (this.wasHeld) { // put down by a human: offended, or pretends nothing happened
       this.wasHeld = false;
-      if (Math.random() < 0.35) { this.fx('hiss!', this.headPos(), 'bubble'); return this.set('arch', 1.2); }
+      if (this.personality === 'timid' || Math.random() < 0.35) {
+        this.fx('hiss!', this.headPos(), 'bubble');
+        this.sound?.('hiss');
+        return this.set('arch', 1.2);
+      }
       return this.set('groom', rand(2, 4));
     }
     if (this.hunting) { // pounced: sit on the "prey" for a moment
@@ -549,6 +579,9 @@ export class Brain {
     this.interrupt();
     this.wasHeld = true;
     this.surf = null; this.jump = null; this.leaving = false;
+    if (this.personality === 'timid' || Math.random() < 0.25) {
+      this.sound?.('hiss');
+    }
     this.set('held');
   }
 
@@ -565,12 +598,19 @@ export class Brain {
     const head = this.headPos();
     if (this.posture === 'lie' || this.mode === 'tuck') { // a sleepy or loafing cat purrs and stays put
       this.fx('purr~', { x: head.x, y: head.y - 26 }, 'bubble');
+      this.sound?.('purr');
       this.timer += 5;
+      return;
+    }
+    if (this.personality === 'timid' && Math.random() < 0.35) {
+      this.fx('hiss!', head, 'bubble');
+      this.sound?.('hiss');
       return;
     }
     if (Math.random() < 0.15) return this.fx('...', head, 'bubble'); // not now, human
     this.interrupt();
     this.set('pet', 3.5);
+    this.sound?.('purr');
     for (let i = 0; i < 3; i++) setTimeout(() => this.fx('♥', this.headPos(), 'heart'), i * 350);
     this.fx('purr~', { x: head.x, y: head.y - 26 }, 'bubble');
   }

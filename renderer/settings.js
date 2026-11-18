@@ -1,5 +1,5 @@
 import { Cat2D, COATS } from './cat2d.js';
-import { LANGUAGES, setLanguage, setPlatform, t, coatName } from './i18n.js';
+import { LANGUAGES, setLanguage, setPlatform, t, coatName, personalityName } from './i18n.js';
 
 const MAX_CATS = 8;
 const ARROWS = '<svg viewBox="0 0 8 10" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3.8 4 1.3l2.5 2.5M1.5 6.2 4 8.7l2.5-2.5"/></svg>';
@@ -81,14 +81,25 @@ function renderCats() {
     list.append(empty);
   }
   const coats = Object.keys(COATS).map((k) => [k, coatName(k)]);
+  const personalities = ['normal', 'lazy', 'hyper', 'timid'].map((k) => [k, personalityName(k)]);
   settings.cats.forEach((c, i) => {
     const row = document.createElement('div');
     row.className = 'row selectable' + (c.id === selected ? ' sel' : '');
     row.append(portrait(c.coat));
-    const label = document.createElement('span');
-    label.className = 'label';
-    label.textContent = t('catN', i + 1);
-    row.append(label, popup(coats, c.coat, (coat) => save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, coat } : k)) })));
+
+    const nameInput = document.createElement('input');
+    nameInput.className = 'cat-name-input';
+    nameInput.value = c.name || '';
+    nameInput.placeholder = t('catN', i + 1);
+    nameInput.title = t('catName');
+    nameInput.onchange = () => save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, name: nameInput.value.trim() } : k)) });
+    nameInput.onmousedown = (e) => e.stopPropagation();
+
+    row.append(
+      nameInput,
+      popup(coats, c.coat, (coat) => save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, coat } : k)) })),
+      popup(personalities, c.personality || 'normal', (personality) => save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, personality } : k)) }))
+    );
     row.onmousedown = () => { selected = c.id; renderCats(); };
     list.append(row);
   });
@@ -102,7 +113,7 @@ function renderCats() {
 $('#addCat').onclick = () => {
   const id = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; // unique even for quick double clicks
   selected = id;
-  save({ cats: [...settings.cats, { id, coat: 'orange' }] });
+  save({ cats: [...settings.cats, { id, name: '', coat: 'orange', personality: 'normal' }] });
 };
 $('#removeCat').onclick = () => {
   const i = settings.cats.findIndex((c) => c.id === selected);
@@ -114,9 +125,10 @@ $('#removeCat').onclick = () => {
 // ---------- other controls ----------
 function renderControls() {
   for (const input of document.querySelectorAll('[data-key]')) input.checked = !!settings[input.dataset.key];
-  for (const id of ['speed', 'size']) {
+  for (const id of ['speed', 'size', 'volume']) {
     const input = $(`#${id}`);
-    input.value = settings[id];
+    if (!input) continue;
+    input.value = settings[id] ?? (id === 'volume' ? 0.8 : 1);
     input.style.setProperty('--p', `${((input.value - input.min) / (input.max - input.min)) * 100}%`);
   }
   $('#lang').value = uiLang();
@@ -131,7 +143,7 @@ function save(patch) {
 }
 
 for (const input of document.querySelectorAll('[data-key]')) input.onchange = () => save({ [input.dataset.key]: input.checked });
-for (const id of ['speed', 'size']) $(`#${id}`).oninput = (e) => save({ [id]: +e.target.value });
+for (const id of ['speed', 'size', 'volume']) $(`#${id}`)?.addEventListener('input', (e) => save({ [id]: +e.target.value }));
 $('#recall').onclick = () => window.moewki.command('recall');
 $('#nap').onclick = () => window.moewki.command('sleep');
 for (const [code, name] of Object.entries(LANGUAGES)) $('#lang').append(new Option(name, code));
