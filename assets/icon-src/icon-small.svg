@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+  <!-- hand-tuned for 16-24 px: fewer details, pixel-aligned features -->
+  <g fill="#F09A4C" stroke="#F09A4C" stroke-width="1" stroke-linejoin="round">
+    <path d="M2.5 7.5 L3 1.5 L7 4.5 Z"/>
+    <path d="M13.5 7.5 L13 1.5 L9 4.5 Z"/>
+  </g>
+  <path d="M3.6 5.6 L3.9 3.3 L5.6 4.6 Z M12.4 5.6 L12.1 3.3 L10.4 4.6 Z" fill="#F4A3A0"/>
+  <ellipse cx="8" cy="9.4" rx="6.6" ry="5.6" fill="#F09A4C"/>
+  <ellipse cx="8" cy="12" rx="2.8" ry="2" fill="#FFF1E0"/>
+  <rect x="4.5" y="8" width="2" height="2.5" rx="1" fill="#3B2A20"/>
+  <rect x="9.5" y="8" width="2" height="2.5" rx="1" fill="#3B2A20"/>
+  <path d="M7 11 H9 L8 12 Z" fill="#E66F82"/>
+</svg>

@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Moewki</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; user-select: none; }
+    #fx { position: fixed; inset: 0; pointer-events: none; font-family: 'Segoe UI', sans-serif; }
+    .fx { position: absolute; font-weight: 700; transform: translate(-50%, -50%); animation: rise 1.8s ease-out forwards; }
+    .z { color: #6a7dd6; font-size: 18px; text-shadow: 0 0 3px #fff; }
+    .heart { color: #ff5d8f; font-size: 20px; text-shadow: 0 0 3px #fff; }
+    .bubble { color: #3a2618; font-size: 13px; background: #fff; border: 2px solid #3a2618; border-radius: 10px; padding: 1px 7px; }
+    @keyframes rise { from { opacity: 0; margin-top: 0; } 15% { opacity: 1; } to { opacity: 0; margin-top: -48px; margin-left: 14px; } }
+    canvas { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <canvas id="cats"></canvas>
+  <canvas id="debug"></canvas>
+  <div id="fx"></div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

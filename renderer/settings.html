@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>Moewki</title>
+  <style>
+    /* macOS (Sonoma-style) tokens */
+    :root {
+      color-scheme: light;
+      --accent: #007aff;
+      --text: rgba(0, 0, 0, 0.85);
+      --text-2: rgba(0, 0, 0, 0.5);
+      --text-3: rgba(0, 0, 0, 0.25);
+      --sidebar: #e8e6e9;
+      --content: #f6f6f6;
+      --group: #ffffff;
+      --group-border: rgba(0, 0, 0, 0.07);
+      --separator: rgba(0, 0, 0, 0.08);
+      --control: #ffffff;
+      --control-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 0.5px 1.5px rgba(0, 0, 0, 0.18);
+      --switch-off: rgba(0, 0, 0, 0.09);
+      --track: rgba(0, 0, 0, 0.1);
+      --knob: #ffffff;
+      --select-inactive: rgba(0, 0, 0, 0.09);
+      --thumb-bg: rgba(0, 0, 0, 0.04);
+      --light-off: #dcdcdc;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --accent: #0a84ff;
+        --text: rgba(255, 255, 255, 0.86);
+        --text-2: rgba(255, 255, 255, 0.55);
+        --text-3: rgba(255, 255, 255, 0.25);
+        --sidebar: #2b2a2c;
+        --content: #1e1e1e;
+        --group: rgba(255, 255, 255, 0.05);
+        --group-border: rgba(255, 255, 255, 0.06);
+        --separator: rgba(255, 255, 255, 0.08);
+        --control: rgba(255, 255, 255, 0.16);
+        --control-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 0.5px 1px rgba(0, 0, 0, 0.4);
+        --switch-off: rgba(255, 255, 255, 0.16);
+        --track: rgba(255, 255, 255, 0.14);
+        --knob: #e6e6e6;
+        --select-inactive: rgba(255, 255, 255, 0.1);
+        --thumb-bg: rgba(255, 255, 255, 0.07);
+        --light-off: #4b4a4d;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    body {
+      font: 13px/16px -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', 'Leelawadee UI', sans-serif;
+      color: var(--text); background: var(--content);
+      user-select: none; cursor: default; -webkit-font-smoothing: antialiased;
+      display: flex;
+    }
+    button, select, input { font: inherit; color: inherit; cursor: default; margin: 0; }
+    :focus { outline: none; }
+    :focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent); }
+
+    /* ---------- sidebar ---------- */
+    .sidebar { width: 216px; flex: none; background: var(--sidebar); padding: 52px 10px 10px; position: relative;
+               border-right: 1px solid var(--separator); -webkit-app-region: drag; }
+    body.mac .sidebar { background: transparent; } /* native vibrancy shows through */
+    .nav { display: flex; flex-direction: column; gap: 2px; -webkit-app-region: no-drag; }
+    .nav button { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px;
+                  background: none; text-align: left; }
+    .nav button.on { background: var(--accent); color: #fff; }
+    body.inactive .nav button.on { background: var(--select-inactive); color: var(--text); }
+    .nav .sq { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; flex: none;
+               box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12); }
+    .nav .sq svg { width: 14px; height: 14px; }
+
+    /* traffic lights drawn by the page (Windows); macOS shows its own */
+    .lights { position: absolute; top: 20px; left: 20px; display: flex; gap: 8px; -webkit-app-region: no-drag; }
+    body.mac .lights { display: none; }
+    .lights button { width: 12px; height: 12px; padding: 0; border-radius: 50%; border: 0; display: grid; place-items: center;
+                     box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18); }
+    .lights .close { background: #ff5f57; } .lights .min { background: #febc2e; } .lights .zoom { background: #28c840; }
+    .lights .zoom:disabled { background: var(--light-off); }
+    .lights svg { width: 8px; height: 8px; opacity: 0; }
+    .lights:hover svg { opacity: 1; }
+    body.inactive .lights button:not(:hover) { background: var(--light-off); }
+    .lights:hover button.close { background: #ff5f57; } .lights:hover button.min { background: #febc2e; }
+    .lights:hover button.zoom:disabled { background: var(--light-off); }
+
+    /* ---------- content ---------- */
+    .content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .toolbar { height: 52px; flex: none; display: flex; align-items: center; padding: 0 20px; -webkit-app-region: drag; }
+    .toolbar h1 { font-size: 15px; font-weight: 700; margin: 0; }
+    .pages { flex: 1; overflow-y: auto; padding: 0 20px 20px; }
+    .pages::-webkit-scrollbar { width: 10px; }
+    .pages::-webkit-scrollbar-thumb { background: var(--text-3); border: 3px solid transparent; border-radius: 5px; background-clip: padding-box; }
+    .page { display: none; }
+    .page.on { display: block; }
+
+    h2 { font-size: 13px; font-weight: 600; margin: 18px 2px 6px; }
+    h2:first-child { margin-top: 0; }
+    .group { background: var(--group); border: 1px solid var(--group-border); border-radius: 8px; overflow: hidden; }
+    .group + .group, .group + .note { margin-top: 18px; }
+    .row { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 7px 10px; position: relative; }
+    .row + .row::before { content: ''; position: absolute; top: 0; left: 10px; right: 10px; height: 1px; background: var(--separator); }
+    .row .label { flex: 1; min-width: 0; }
+    .row .desc { display: block; font-size: 11px; line-height: 14px; color: var(--text-2); margin-top: 1px; }
+    .note { color: var(--text-2); font-size: 11px; margin: 6px 2px 0; }
+    /* Thai glyphs need a touch more size than Latin to read comfortably at caption size */
+    :lang(th) .row .desc, :lang(th) .note { font-size: 12px; line-height: 15px; }
+    .row.selectable.sel { background: var(--accent); color: #fff; }
+    .row.selectable.sel::before, .row.selectable.sel + .row::before { opacity: 0; }
+    body.inactive .row.selectable.sel { background: var(--select-inactive); color: var(--text); }
+    .row canvas { width: 40px; height: 30px; border-radius: 6px; background: var(--thumb-bg); flex: none; }
+    .row.selectable.sel canvas { background: rgba(255, 255, 255, 0.18); }
+
+    /* +/- bar under a list, as in macOS settings panes */
+    .listbar { display: flex; border-top: 1px solid var(--separator); height: 24px; }
+    .listbar button { width: 26px; border: 0; background: none; display: grid; place-items: center; color: var(--text); }
+    .listbar button + button { border-left: 1px solid var(--separator); }
+    .listbar button:last-child { border-right: 1px solid var(--separator); }
+    .listbar button:active { background: var(--separator); }
+    .listbar button:disabled { color: var(--text-3); background: none; }
+    .listbar svg { width: 10px; height: 10px; }
+
+    /* push button */
+    .btn { height: 22px; padding: 0 12px; border: 0; border-radius: 5px; background: var(--control); box-shadow: var(--control-shadow); }
+    .btn:active { filter: brightness(0.93); }
+
+    /* pop-up button */
+    .popup { position: relative; display: inline-flex; }
+    .popup select { appearance: none; height: 22px; min-width: 130px; padding: 0 28px 0 9px; border: 0; border-radius: 5px;
+                    background: var(--control); box-shadow: var(--control-shadow); color: var(--text); }
+    .popup .arrows { position: absolute; right: 3px; top: 3px; width: 16px; height: 16px; border-radius: 4px; background: var(--accent);
+                     display: grid; place-items: center; pointer-events: none; }
+    body.inactive .popup .arrows { background: var(--text-3); }
+    .popup .arrows svg { width: 8px; height: 10px; }
+    .popup select option { background: var(--content); color: var(--text); }
+
+    /* switch */
+    .switch { appearance: none; width: 32px; height: 18px; border-radius: 9px; background: var(--switch-off); position: relative; flex: none;
+              box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.06); transition: background 0.2s; }
+    .switch::after { content: ''; position: absolute; top: 1px; left: 1px; width: 16px; height: 16px; border-radius: 50%; background: var(--knob);
+                     box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.25); transition: transform 0.2s; }
+    .switch:checked { background: var(--accent); }
+    .switch:checked::after { transform: translateX(14px); }
+    body.inactive .switch:checked { background: var(--text-3); }
+
+    /* slider */
+    .slider { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 11px; }
+    .slider input { appearance: none; width: 170px; height: 20px; background: transparent; }
+    .slider input::-webkit-slider-runnable-track { height: 4px; border-radius: 2px;
+      background: linear-gradient(to right, var(--accent) var(--p, 50%), var(--track) var(--p, 50%)); }
+    .slider input::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; margin-top: -8px; border-radius: 50%; background: var(--knob);
+      box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.25); }
+    body.inactive .slider input::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--text-3) var(--p, 50%), var(--track) var(--p, 50%)); }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="lights">
+      <button class="close" data-act="close" aria-label="Close"><svg viewBox="0 0 8 8" stroke="rgba(0,0,0,0.55)" stroke-width="1.1" stroke-linecap="round"><path d="M2 2l4 4M6 2 2 6"/></svg></button>
+      <button class="min" data-act="minimize" aria-label="Minimize"><svg viewBox="0 0 8 8" stroke="rgba(0,0,0,0.55)" stroke-width="1.1" stroke-linecap="round"><path d="M1.5 4h5"/></svg></button>
+      <button class="zoom" disabled aria-hidden="true"></button>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-page="cats"><span class="sq" style="background:#ff9500"><svg viewBox="0 0 20 20" fill="#fff"><path d="M3.6 9 4.4 2.8 8.4 6h3.2l4-3.2.8 6.2c.7 1 1.1 2.1 1.1 3.3 0 3.6-3.3 5.7-7.5 5.7s-7.5-2.1-7.5-5.7c0-1.2.4-2.3 1.1-3.3Z"/></svg></span><span data-i18n="cats"></span></button>
+      <button data-page="behaviour"><span class="sq" style="background:#af52de"><svg viewBox="0 0 20 20" fill="#fff"><ellipse cx="10" cy="13.4" rx="4.4" ry="3.6"/><ellipse cx="4.2" cy="8.8" rx="1.9" ry="2.4"/><ellipse cx="7.6" cy="5" rx="1.9" ry="2.5"/><ellipse cx="12.4" cy="5" rx="1.9" ry="2.5"/><ellipse cx="15.8" cy="8.8" rx="1.9" ry="2.4"/></svg></span><span data-i18n="behaviour"></span></button>
+      <button data-page="display"><span class="sq" style="background:#007aff"><svg viewBox="0 0 20 20" fill="#fff"><path d="M3.5 3.5h13a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 13V5a1.5 1.5 0 0 1 1.5-1.5ZM7 16.5h6v1.2H7z"/></svg></span><span data-i18n="display"></span></button>
+      <button data-page="general"><span class="sq" style="background:#8e8e93"><svg viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 14h13"/><circle cx="7.5" cy="6" r="2" fill="#8e8e93"/><circle cx="12.5" cy="14" r="2" fill="#8e8e93"/></svg></span><span data-i18n="general"></span></button>
+    </nav>
+  </aside>
+
+  <section class="content">
+    <header class="toolbar"><h1 id="title"></h1></header>
+    <div class="pages">
+      <div class="page" data-page="cats">
+        <div class="group">
+          <div id="catList"></div>
+          <div class="listbar">
+            <button id="addCat"><svg viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M5 1v8M1 5h8"/></svg></button>
+            <button id="removeCat"><svg viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M1 5h8"/></svg></button>
+          </div>
+        </div>
+        <p class="note" id="catNote"></p>
+      </div>
+
+      <div class="page" data-page="behaviour">
+        <div class="group">
+          <div class="row"><span class="label"><span data-i18n="hop"></span><span class="desc" data-i18n="hopDesc"></span></span><input type="checkbox" class="switch" data-key="hop"></div>
+          <div class="row"><span class="label"><span data-i18n="sleepOnWindows"></span><span class="desc" data-i18n="sleepOnWindowsDesc"></span></span><input type="checkbox" class="switch" data-key="sleepOnWindows"></div>
+          <div class="row"><span class="label"><span data-i18n="offscreen"></span><span class="desc" data-i18n="offscreenDesc"></span></span><input type="checkbox" class="switch" data-key="offscreen"></div>
+          <div class="row"><span class="label"><span data-i18n="taskbar"></span><span class="desc" data-i18n="taskbarDesc"></span></span><input type="checkbox" class="switch" data-key="taskbar"></div>
+        </div>
+      </div>
+
+      <div class="page" data-page="display">
+        <div class="group">
+          <div class="row"><span class="label"><span data-i18n="speed"></span><span class="desc" data-i18n="speedDesc"></span></span>
+            <span class="slider"><span data-i18n="slow"></span><input id="speed" type="range" min="0.4" max="2" step="0.1"><span data-i18n="fast"></span></span></div>
+          <div class="row"><span class="label"><span data-i18n="size"></span></span>
+            <span class="slider"><span data-i18n="small"></span><input id="size" type="range" min="0.6" max="1.8" step="0.1"><span data-i18n="large"></span></span></div>
+        </div>
+      </div>
+
+      <div class="page" data-page="general">
+        <div class="group">
+          <div class="row"><span class="label"><span data-i18n="language"></span><span class="desc" data-i18n="languageDesc"></span></span>
+            <span class="popup"><select id="lang"></select><span class="arrows"></span></span></div>
+        </div>
+        <h2 data-i18n="actions"></h2>
+        <div class="group">
+          <div class="row"><span class="label"><span data-i18n="recall"></span><span class="desc" data-i18n="recallDesc"></span></span><button class="btn" id="recall" data-i18n="recallBtn"></button></div>
+          <div class="row"><span class="label"><span data-i18n="nap"></span><span class="desc" data-i18n="napDesc"></span></span><button class="btn" id="nap" data-i18n="napBtn"></button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+<script type="module">
+import { Cat2D, COATS } from './cat2d.js';
+import { LANGUAGES, setLanguage, setPlatform, t, coatName } from './i18n.js';
+
+const MAX_CATS = 8;
+const ARROWS = '<svg viewBox="0 0 8 10" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3.8 4 1.3l2.5 2.5M1.5 6.2 4 8.7l2.5-2.5"/></svg>';
+const $ = (sel) => document.querySelector(sel);
+
+const platform = new URLSearchParams(location.search).get('platform') ?? 'win';
+document.body.classList.add(platform);
+setPlatform(platform);
+for (const a of document.querySelectorAll('.popup .arrows')) a.innerHTML = ARROWS;
+
+// dim selection, switches and traffic lights when the window is in the background, like AppKit does
+addEventListener('blur', () => document.body.classList.add('inactive'));
+addEventListener('focus', () => document.body.classList.remove('inactive'));
+for (const b of document.querySelectorAll('.lights [data-act]')) b.onclick = () => window.moewki.windowAction(b.dataset.act);
+addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'w') window.moewki.windowAction('close');
+});
+
+// accent: the user's macOS accent colour, the standard macOS blue elsewhere
+window.moewki.getAccent().then((c) => c && document.documentElement.style.setProperty('--accent', c));
+window.moewki.onAccent((c) => c && document.documentElement.style.setProperty('--accent', c));
+
+let settings = await window.moewki.getSettings();
+let selected = null; // id of the highlighted cat in the list
+const portraits = new Set();
+
+// ---------- sidebar pages ----------
+let page = 'cats';
+try { page = localStorage.getItem('moewki.page') || page; } catch { /* storage unavailable */ }
+function showPage(p) {
+  page = p;
+  for (const b of document.querySelectorAll('#nav button')) b.classList.toggle('on', b.dataset.page === p);
+  for (const el of document.querySelectorAll('.page')) el.classList.toggle('on', el.dataset.page === p);
+  $('#title').textContent = t(p);
+  try { localStorage.setItem('moewki.page', p); } catch { /* storage unavailable */ }
+}
+for (const b of document.querySelectorAll('#nav button')) b.onclick = () => showPage(b.dataset.page);
+$('#nav').addEventListener('keydown', (e) => {
+  const pages = [...document.querySelectorAll('#nav button')].map((b) => b.dataset.page);
+  const step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+  if (!step) return;
+  e.preventDefault();
+  const next = pages[(pages.indexOf(page) + step + pages.length) % pages.length];
+  showPage(next);
+  document.querySelector(`#nav button[data-page="${next}"]`).focus();
+});
+
+// ---------- cat list ----------
+function popup(options, value, onChange) {
+  const wrap = document.createElement('span');
+  wrap.className = 'popup';
+  wrap.innerHTML = `<select></select><span class="arrows">${ARROWS}</span>`;
+  const select = wrap.querySelector('select');
+  for (const [v, label] of options) select.append(new Option(label, v, false, v === value));
+  select.onchange = () => onChange(select.value);
+  select.onmousedown = (e) => e.stopPropagation(); // don't change the row selection
+  return wrap;
+}
+
+function portrait(coat) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 40 * devicePixelRatio; canvas.height = 30 * devicePixelRatio;
+  const cat = new Cat2D(coat);
+  cat.animator.t = Math.random() * 10;
+  portraits.add({ canvas, cat });
+  return canvas;
+}
+
+function renderCats() {
+  const list = $('#catList');
+  for (const p of [...portraits]) if (list.contains(p.canvas)) portraits.delete(p);
+  list.replaceChildren();
+  if (!settings.cats.some((c) => c.id === selected)) selected = settings.cats.at(-1)?.id ?? null;
+
+  if (!settings.cats.length) {
+    const empty = document.createElement('div');
+    empty.className = 'row';
+    empty.innerHTML = `<span class="label" style="color: var(--text-2)">${t('noCats')}</span>`;
+    list.append(empty);
+  }
+  const coats = Object.keys(COATS).map((k) => [k, coatName(k)]);
+  settings.cats.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'row selectable' + (c.id === selected ? ' sel' : '');
+    row.append(portrait(c.coat));
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = t('catN', i + 1);
+    row.append(label, popup(coats, c.coat, (coat) => save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, coat } : k)) })));
+    row.onmousedown = () => { selected = c.id; renderCats(); };
+    list.append(row);
+  });
+  $('#addCat').disabled = settings.cats.length >= MAX_CATS;
+  $('#removeCat').disabled = !selected;
+  $('#addCat').title = t('addTip');
+  $('#removeCat').title = t('removeTip');
+  $('#catNote').textContent = t(settings.cats.length >= MAX_CATS ? 'addFull' : 'addDesc', MAX_CATS);
+}
+
+$('#addCat').onclick = () => {
+  const id = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; // unique even for quick double clicks
+  selected = id;
+  save({ cats: [...settings.cats, { id, coat: 'orange' }] });
+};
+$('#removeCat').onclick = () => {
+  const i = settings.cats.findIndex((c) => c.id === selected);
+  const cats = settings.cats.filter((c) => c.id !== selected);
+  selected = cats[Math.min(i, cats.length - 1)]?.id ?? null;
+  save({ cats });
+};
+
+// ---------- other controls ----------
+function renderControls() {
+  for (const input of document.querySelectorAll('[data-key]')) input.checked = !!settings[input.dataset.key];
+  for (const id of ['speed', 'size']) {
+    const input = $(`#${id}`);
+    input.value = settings[id];
+    input.style.setProperty('--p', `${((input.value - input.min) / (input.max - input.min)) * 100}%`);
+  }
+  $('#lang').value = uiLang();
+}
+
+function save(patch) {
+  settings = { ...settings, ...patch };
+  window.moewki.setSettings(patch);
+  if ('cats' in patch) renderCats();
+  applyLanguage();
+  renderControls();
+}
+
+for (const input of document.querySelectorAll('[data-key]')) input.onchange = () => save({ [input.dataset.key]: input.checked });
+for (const id of ['speed', 'size']) $(`#${id}`).oninput = (e) => save({ [id]: +e.target.value });
+$('#recall').onclick = () => window.moewki.command('recall');
+$('#nap').onclick = () => window.moewki.command('sleep');
+for (const [code, name] of Object.entries(LANGUAGES)) $('#lang').append(new Option(name, code));
+$('#lang').onchange = (e) => save({ lang: e.target.value });
+window.moewki.onSettings((s) => {
+  const catsChanged = JSON.stringify(s.cats) !== JSON.stringify(settings.cats);
+  settings = s;
+  if (catsChanged) renderCats();
+  applyLanguage();
+  renderControls();
+});
+
+// ---------- language ----------
+const uiLang = () => (settings.lang in LANGUAGES ? settings.lang : 'en');
+let appliedLang = null;
+function applyLanguage() {
+  if (uiLang() === appliedLang) return;
+  appliedLang = uiLang();
+  setLanguage(appliedLang);
+  document.documentElement.lang = appliedLang;
+  for (const node of document.querySelectorAll('[data-i18n]')) node.textContent = t(node.dataset.i18n);
+  $('#title').textContent = t(page);
+  renderCats();
+}
+
+applyLanguage();
+showPage(document.querySelector(`#nav button[data-page="${page}"]`) ? page : 'cats');
+renderControls();
+
+// small animated portraits in the cat list
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  for (const { canvas, cat } of portraits) {
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    cat.animator.update(dt, 'idle', { dir: 1 });
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+    cat.draw(ctx, 21, 27, 0.24);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
