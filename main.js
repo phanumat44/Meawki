@@ -5,10 +5,14 @@ const fs = require('fs');
 const IS_MAC = process.platform === 'darwin';
 const winapi = IS_MAC ? require('./macapi') : require('./winapi');
 const { listWindows } = winapi;
+const { worldFor, neighbours, assignCats } = require('./layout');
 const HIDE_SHORTCUT = 'Control+Alt+H'; // Ctrl+Option+H on macOS (Cmd+Option+H is "hide others" there)
 
-let overlay, tray, pollTimer, fullscreenTimer, settingsWin;
+let tray, pollTimer, fullscreenTimer, settingsWin;
 let hiddenByFullscreen = false;
+// one transparent overlay per display; each cat lives on one of them at a time
+const overlays = new Map(); // display id -> { win, display, hwnd }
+let catOwners = new Map();  // cat id -> display id
 
 // --- settings, saved in the user's app data folder ---
 const DEFAULTS = {
@@ -33,8 +37,19 @@ function saveSettings() {
 }
 function broadcastSettings() {
   const live = { ...settings, launchAtLogin: launchesAtLogin() };
-  for (const w of [overlay, settingsWin]) if (w && !w.isDestroyed()) w.webContents.send('settings', live);
+  if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('settings', live);
+  catOwners = assignCats(settings.cats, catOwners, [...overlays.keys()], screen.getPrimaryDisplay().id);
+  for (const [id, o] of overlays) sendTo(o.win, 'settings', overlaySettings(id));
 }
+// an overlay only hears about the cats that live on its display
+const overlaySettings = (displayId) => ({ ...settings, cats: settings.cats.filter((c) => catOwners.get(c.id) === displayId) });
+
+function sendTo(win, channel, data) {
+  if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+    try { win.webContents.send(channel, data); } catch { /* frame is being torn down */ }
+  }
+}
+const toAllOverlays = (channel, data) => { for (const o of overlays.values()) sendTo(o.win, channel, data); };
 
 const TRAY_TEXT = {
   th: { settings: 'การตั้งค่า…', hide: 'ซ่อนแมว', recall: 'เรียกแมวกลับมา', nap: 'ให้แมวนอน', quit: 'ออกจาก Moewki' },
@@ -47,8 +62,8 @@ function buildTrayMenu() {
     { type: 'separator' },
     { label: tx.hide, type: 'checkbox', checked: !!settings.hidden, accelerator: HIDE_SHORTCUT, registerAccelerator: false,
       click: (item) => setHidden(item.checked) },
-    { label: tx.recall, click: () => overlay.webContents.send('command', 'recall') },
-    { label: tx.nap, click: () => overlay.webContents.send('command', 'sleep') },
+    { label: tx.recall, click: () => toAllOverlays('command', 'recall') },
+    { label: tx.nap, click: () => toAllOverlays('command', 'sleep') },
     { type: 'separator' },
     { label: tx.quit, accelerator: IS_MAC ? 'Command+Q' : undefined, click: () => app.quit() },
   ]));
@@ -101,13 +116,15 @@ function setHidden(on) {
 }
 
 function applyVisibility() {
-  if (!overlay || overlay.isDestroyed()) return;
   const show = !settings.hidden && !hiddenByFullscreen;
-  if (show && !overlay.isVisible()) {
-    overlay.showInactive(); // never take focus from what the user is doing
-    overlay.setAlwaysOnTop(true, 'screen-saver');
-  } else if (!show && overlay.isVisible()) {
-    overlay.hide();
+  for (const { win } of overlays.values()) {
+    if (win.isDestroyed()) continue;
+    if (show && !win.isVisible()) {
+      win.showInactive(); // never take focus from what the user is doing
+      win.setAlwaysOnTop(true, 'screen-saver');
+    } else if (!show && win.isVisible()) {
+      win.hide();
+    }
   }
 }
 
@@ -133,68 +150,87 @@ function accentColor() {
   try { return `#${systemPreferences.getAccentColor().slice(0, 6)}`; } catch { return null; }
 }
 
-// --- the overlay the cats live on ---
-function overlayBounds() {
-  return screen.getPrimaryDisplay().bounds;
-}
-
-function createOverlay() {
-  const b = overlayBounds();
-  overlay = new BrowserWindow({
+// --- the overlays the cats live on ---
+function createOverlay(display) {
+  const b = display.bounds;
+  const win = new BrowserWindow({
     x: b.x, y: b.y, width: b.width, height: b.height,
     transparent: true, frame: false, resizable: false, movable: false,
     skipTaskbar: true, focusable: false, hasShadow: false, alwaysOnTop: true,
-    enableLargerThanScreen: true, roundedCorners: false,
+    enableLargerThanScreen: true, roundedCorners: false, show: false,
     backgroundColor: '#00000000',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false },
   });
-  overlay.setAlwaysOnTop(true, 'screen-saver');
-  overlay.setIgnoreMouseEvents(true, { forward: true });
-  overlay.setContentProtection(!!settings.hideFromCapture); // keep cats out of screen shares and recordings
-  if (IS_MAC) {
-    overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    overlay.setBounds(b); // macOS may nudge a window below the menu bar on creation
-  }
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.setIgnoreMouseEvents(true, { forward: true });
+  win.setContentProtection(!!settings.hideFromCapture); // keep cats out of screen shares and recordings
+  if (IS_MAC) win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  win.setBounds(b); // creating a window can nudge it (below the macOS menu bar, or across DPI on Windows)
   const query = {};
   if (process.argv.includes('--cat-debug')) query.debug = '1';
-  overlay.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query });
-  if (process.argv.includes('--cat-debug')) {
-    overlay.webContents.on('console-message', (e) => console.log(e.message));
-  }
-  if (process.argv.includes('--devtools')) overlay.webContents.openDevTools({ mode: 'detach' });
-
-  // Windows lists every top-level window, so skip ours by handle; macOS skips our process instead.
-  const exclude = new Set(IS_MAC ? [] : [String(overlay.getNativeWindowHandle().readBigUInt64LE(0))]);
-  overlay.webContents.on('did-finish-load', () => {
-    clearInterval(pollTimer);
-    pollTimer = setInterval(() => sendWorld(exclude), 33);
-  });
-  overlay.on('close', () => clearInterval(pollTimer));
+  win.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query });
+  if (process.argv.includes('--cat-debug')) win.webContents.on('console-message', (e) => console.log(`[${display.id}] ${e.message}`));
+  if (process.argv.includes('--devtools')) win.webContents.openDevTools({ mode: 'detach' });
+  win.webContents.on('did-finish-load', () => sendTo(win, 'settings', overlaySettings(display.id)));
+  // Windows lists every top-level window, so ours are skipped by handle; macOS skips our process instead
+  const hwnd = IS_MAC ? null : String(win.getNativeWindowHandle().readBigUInt64LE(0));
+  return { win, display, hwnd };
 }
 
-function sendWorld(exclude) {
-  if (!overlay || overlay.isDestroyed() || overlay.webContents.isDestroyed() || !overlay.isVisible()) return;
-  const display = screen.getPrimaryDisplay();
-  const b = display.bounds;
+// Match the overlays to the connected displays: add, remove, or move them as screens change.
+function syncOverlays() {
+  const displays = screen.getAllDisplays();
+  for (const [id, o] of overlays) {
+    if (!displays.some((d) => d.id === id)) { o.win.destroy(); overlays.delete(id); }
+  }
+  for (const d of displays) {
+    const o = overlays.get(d.id);
+    if (!o) overlays.set(d.id, createOverlay(d));
+    else { o.display = d; o.win.setBounds(d.bounds); }
+  }
+  applyVisibility();
+  broadcastSettings(); // re-home cats from screens that went away
+}
+
+function pollWindows() {
+  const displays = screen.getAllDisplays();
+  const exclude = new Set([...overlays.values()].map((o) => o.hwnd).filter(Boolean));
   const windows = listWindows(exclude).map((w) => {
     // Windows reports physical pixels; macOS already reports points (= Electron DIPs)
     const r = IS_MAC ? { x: w.x, y: w.y, width: w.w, height: w.h }
       : screen.screenToDipRect(null, { x: w.x, y: w.y, width: w.w, height: w.h });
-    return { id: w.id, title: w.title, x: r.x - b.x, y: r.y - b.y, w: r.width, h: r.height };
+    return { id: w.id, title: w.title, x: r.x, y: r.y, w: r.width, h: r.height };
   });
-  // the floor is the top of the taskbar (Windows) or of the Dock (macOS)
-  const wa = display.workArea;
-  try { overlay.webContents.send('world', {
-    width: b.width, height: b.height,
-    floorY: wa.y + wa.height - b.y, floorX1: wa.x - b.x, floorX2: wa.x + wa.width - b.x,
-    windows,
-  }); } catch { /* frame is being torn down on quit */ }
+  for (const o of overlays.values()) {
+    if (o.win.isVisible()) sendTo(o.win, 'world', worldFor(o.display, windows, displays));
+  }
 }
 
-ipcMain.on('set-ignore-mouse', (_e, ignore) => {
-  if (overlay && !overlay.isDestroyed()) overlay.setIgnoreMouseEvents(ignore, { forward: true });
+// A cat walked (or was thrown) off a side of its display that has a neighbour: move it over there.
+function transferCat(fromDisplayId, catId, side) {
+  const from = overlays.get(fromDisplayId);
+  const toId = from && neighbours(from.display, screen.getAllDisplays())[side < 0 ? 'left' : 'right'];
+  if (!toId || !overlays.has(toId)) return false;
+  catOwners.set(catId, toId);
+  // tell the new display first, so it knows which edge the cat comes in from when it appears in its settings
+  sendTo(overlays.get(toId).win, 'cat:arrive', { id: catId, from: side < 0 ? 'right' : 'left' });
+  for (const id of [fromDisplayId, toId]) sendTo(overlays.get(id).win, 'settings', overlaySettings(id));
+  return true;
+}
+
+const overlayOf = (sender) => [...overlays.entries()].find(([, o]) => o.win.webContents === sender);
+
+ipcMain.on('set-ignore-mouse', (e, ignore) => {
+  overlayOf(e.sender)?.[1].win.setIgnoreMouseEvents(ignore, { forward: true });
 });
-ipcMain.handle('settings:get', () => ({ ...settings, launchAtLogin: launchesAtLogin() }));
+ipcMain.handle('cat:leave', (e, { id, side }) => {
+  const entry = overlayOf(e.sender);
+  return !!entry && transferCat(entry[0], id, side);
+});
+ipcMain.handle('settings:get', (e) => {
+  const entry = overlayOf(e.sender);
+  return entry ? overlaySettings(entry[0]) : { ...settings, launchAtLogin: launchesAtLogin() };
+});
 ipcMain.handle('system:accent', accentColor);
 ipcMain.on('settings:set', (_e, patch) => {
   if ('launchAtLogin' in patch) setLaunchAtLogin(patch.launchAtLogin);
@@ -203,10 +239,10 @@ ipcMain.on('settings:set', (_e, patch) => {
   saveSettings();
   broadcastSettings();
   if ('lang' in patch) buildTrayMenu();
-  if ('hideFromCapture' in patch) overlay.setContentProtection(!!patch.hideFromCapture);
+  if ('hideFromCapture' in patch) for (const o of overlays.values()) o.win.setContentProtection(!!patch.hideFromCapture);
   if ('autoHide' in patch && !patch.autoHide) { hiddenByFullscreen = false; applyVisibility(); }
 });
-ipcMain.on('command', (_e, c) => overlay?.webContents.send('command', c));
+ipcMain.on('command', (_e, c) => toAllOverlays('command', c));
 // title bar buttons drawn by the settings page on Windows
 ipcMain.on('window', (e, action) => {
   const w = BrowserWindow.fromWebContents(e.sender);
@@ -225,7 +261,9 @@ if (IS_MAC) app.dock?.hide(); // a menu bar app: no Dock icon while only the cat
 
 app.whenReady().then(() => {
   loadSettings();
-  createOverlay();
+  syncOverlays();
+  pollTimer = setInterval(pollWindows, 33);
+  for (const ev of ['display-added', 'display-removed', 'display-metrics-changed']) screen.on(ev, syncOverlays);
   tray = new Tray(trayIcon());
   tray.setToolTip('Moewki');
   buildTrayMenu();
@@ -239,7 +277,6 @@ app.whenReady().then(() => {
   for (const [keys, fn] of Object.entries(shortcuts)) {
     if (!globalShortcut.register(keys, fn)) console.warn(`shortcut ${keys} is taken by another app`);
   }
-  screen.on('display-metrics-changed', () => overlay.setBounds(overlayBounds()));
 });
 
 // closing the settings window must not quit the app

@@ -19,6 +19,7 @@ export class World {
 
   update(data, catHeight) {
     this.width = data.width; this.height = data.height;
+    this.neighbours = data.neighbours ?? { left: false, right: false }; // other displays beside this one
     this.floor = { id: 'floor', y: data.floorY, x1: data.floorX1, x2: data.floorX2 };
     const prev = this.windows;
     this.windows = new Map();
@@ -234,6 +235,8 @@ export class Brain {
     if (jumps.length) options.push(['jump', roam ? 24 : 60]);
     if (edge && onWindow) options.push(['lookdown', 12]);
     if (!onWindow && pr.taskbar) options.push(['exit', pr.offscreen ? 4 : 0], ['sniff', 6]);
+    const next = this.world.neighbours ?? {};
+    if (!onWindow && (next.left || next.right)) options.push(['visit', 4]); // wander over to the next screen
     if (friend) options.push(['greet', 9]);
     if (seg.x2 - seg.x1 > 500 && roam) options.push(['zoomies', onWindow ? 1 : 2.5]);
 
@@ -259,6 +262,10 @@ export class Brain {
       case 'exit': {
         const left = this.x < this.world.width / 2;
         return this.walkTo(left ? -90 : this.world.width + 90, Math.random() < 0.5 ? 230 : 70, true);
+      }
+      case 'visit': {
+        const left = next.left && (!next.right || Math.random() < 0.5);
+        return this.walkTo(left ? -90 : this.world.width + 90, 70, true);
       }
     }
   }
@@ -485,11 +492,27 @@ export class Brain {
   }
 
   goAway() {
+    const side = this.x < 0 ? -1 : this.x > this.world.width ? 1 : 0;
     this.interrupt();
     this.leaving = false;
     this.surf = null;
     this.hidden = true;
     this.set('away', rand(6, 25));
+    // off a side that has another display: hand the cat over (if that fails it just comes back here later)
+    if (side && this.world.neighbours?.[side < 0 ? 'left' : 'right']) this.onLeave?.(side);
+  }
+
+  // arriving from the display next door: walk in from that edge along the floor
+  enterFrom(edge) {
+    const fromLeft = edge === 'left';
+    this.hidden = false;
+    this.x = fromLeft ? -60 : this.world.width + 60;
+    this.dir = fromLeft ? 1 : -1;
+    this.surf = 'floor';
+    this.y = this.world.floor.y;
+    this.vx = this.vy = 0;
+    this.set('idle');
+    this.walkTo(fromLeft ? rand(120, 420) : this.world.width - rand(120, 420), 70);
   }
 
   comeBack() {

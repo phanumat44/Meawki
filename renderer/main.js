@@ -31,6 +31,7 @@ let settings = {
   hop: true, sleepOnWindows: true, offscreen: true, taskbar: true, speed: 1, size: 1,
 };
 const pets = []; // { id, coat, brain, cat }
+const arrivals = new Map(); // cat id -> edge it walks in from, for cats coming from another display
 
 function catSize() {
   return { w: 110 * SCALE * settings.size, h: 62 * SCALE * settings.size };
@@ -46,6 +47,8 @@ function syncPets() {
       const brain = new Brain(world, fx, catSize());
       brain.x = world.width * (0.2 + Math.random() * 0.6);
       brain.debug = DEBUG;
+      brain.onLeave = (side) => window.moewki.leaveCat(c.id, side);
+      if (arrivals.has(c.id)) { brain.enterFrom(arrivals.get(c.id)); arrivals.delete(c.id); }
       pet = { id: c.id, brain, cat: new Cat2D(c.coat) };
       pets.push(pet);
     }
@@ -62,6 +65,7 @@ function syncPets() {
 
 window.moewki.onWorld((data) => world.update(data, catSize().h));
 window.moewki.onSettings((s) => { settings = { ...settings, ...s }; syncPets(); });
+window.moewki.onCatArrive((a) => arrivals.set(a.id, a.from));
 window.moewki.onCommand((c) => {
   for (const p of pets) c === 'recall' ? p.brain.recall() : c === 'sleep' && p.brain.nap();
 });
