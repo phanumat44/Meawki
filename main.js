@@ -8,9 +8,11 @@ const { listWindows } = winapi;
 const { worldFor, neighbours, assignCats } = require('./layout');
 const updater = require('./updater');
 const HIDE_SHORTCUT = 'Control+Alt+H'; // Ctrl+Option+H on macOS (Cmd+Option+H is "hide others" there)
+const LASER_SHORTCUT = 'Control+Alt+L';
 
 let tray, pollTimer, fullscreenTimer, settingsWin;
 let hiddenByFullscreen = false;
+let laserActive = false;
 // one transparent overlay per display; each cat lives on one of them at a time
 const overlays = new Map(); // display id -> { win, display, hwnd }
 const activeOverlays = new Set(); // displays whose cats are moving (they report it)
@@ -56,11 +58,18 @@ function sendTo(win, channel, data) {
 }
 const toAllOverlays = (channel, data) => { for (const o of overlays.values()) sendTo(o.win, channel, data); };
 
+function setLaser(on) {
+  laserActive = on;
+  toAllOverlays('laser:state', laserActive);
+  if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('laser:state', laserActive);
+  buildTrayMenu();
+}
+
 const TRAY_TEXT = {
-  th: { settings: 'การตั้งค่า…', hide: 'ซ่อนแมว', recall: 'เรียกแมวกลับมา', nap: 'ให้แมวนอน', quit: 'ออกจาก Moewki',
+  th: { settings: 'การตั้งค่า…', hide: 'ซ่อนแมว', laser: 'โหมดเลเซอร์', recall: 'เรียกแมวกลับมา', nap: 'ให้แมวนอน', quit: 'ออกจาก Moewki',
     updateReady: (v) => `รีสตาร์ตเพื่ออัปเดตเป็น ${v}`, updateAvailable: (v) => `ดาวน์โหลด Moewki ${v}…`,
     notifyReady: (v) => `เวอร์ชัน ${v} พร้อมแล้ว คลิกเพื่อรีสตาร์ตและอัปเดต`, notifyAvailable: (v) => `มี Moewki ${v} แล้ว คลิกเพื่อดาวน์โหลด` },
-  en: { settings: 'Settings…', hide: 'Hide cats', recall: 'Call cats back', nap: 'Nap time', quit: 'Quit Moewki',
+  en: { settings: 'Settings…', hide: 'Hide cats', laser: 'Laser pointer', recall: 'Call cats back', nap: 'Nap time', quit: 'Quit Moewki',
     updateReady: (v) => `Restart to update to ${v}`, updateAvailable: (v) => `Download Moewki ${v}…`,
     notifyReady: (v) => `Version ${v} is ready. Click to restart and update.`, notifyAvailable: (v) => `Moewki ${v} is out. Click to download.` },
 };
@@ -75,6 +84,8 @@ function buildTrayMenu() {
     { type: 'separator' },
     { label: tx.hide, type: 'checkbox', checked: !!settings.hidden, accelerator: HIDE_SHORTCUT, registerAccelerator: false,
       click: (item) => setHidden(item.checked) },
+    { label: tx.laser, type: 'checkbox', checked: !!laserActive, accelerator: LASER_SHORTCUT, registerAccelerator: false,
+      click: (item) => setLaser(item.checked) },
     { label: tx.recall, click: () => toAllOverlays('command', 'recall') },
     { label: tx.nap, click: () => toAllOverlays('command', 'sleep') },
     { type: 'separator' },
@@ -283,6 +294,8 @@ ipcMain.on('open:external', (_e, url) => {
   }
 });
 ipcMain.on('command', (_e, c) => toAllOverlays('command', c));
+ipcMain.on('laser:set', (_e, on) => setLaser(on));
+ipcMain.handle('laser:get', () => laserActive);
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('update:get', () => updater.getState());
 ipcMain.on('update:check', () => updater.check());
@@ -334,7 +347,11 @@ app.whenReady().then(() => {
   if (process.argv.includes('--settings')) openSettings();
   watchFullscreen();
   updater.start(onUpdateState);
-  const shortcuts = { 'CommandOrControl+Alt+Q': () => app.quit(), [HIDE_SHORTCUT]: () => setHidden(!settings.hidden) };
+  const shortcuts = {
+    'CommandOrControl+Alt+Q': () => app.quit(),
+    [HIDE_SHORTCUT]: () => setHidden(!settings.hidden),
+    [LASER_SHORTCUT]: () => setLaser(!laserActive),
+  };
   for (const [keys, fn] of Object.entries(shortcuts)) {
     if (!globalShortcut.register(keys, fn)) console.warn(`shortcut ${keys} is taken by another app`);
   }

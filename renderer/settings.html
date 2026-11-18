@@ -167,6 +167,19 @@
     /* cat name input */
     .cat-name-input { width: 95px; background: var(--control); border: 1px solid var(--group-border); border-radius: 6px; padding: 4px 8px; font-size: 12px; color: var(--text); outline: none; }
     .cat-name-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2); }
+
+    /* modal */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal { background: var(--content); border: 1px solid var(--group-border); border-radius: 12px; padding: 18px; width: 340px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+    .modal h2 { margin: 0 0 12px; font-size: 15px; text-align: center; }
+    .modal-preview { display: flex; justify-content: center; margin-bottom: 12px; }
+    .modal-preview canvas { width: 80px; height: 60px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+    input[type="color"] { appearance: none; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; background: transparent; padding: 0; }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border-radius: 6px; border: 1px solid var(--group-border); }
+    .btn-icon { background: none; border: none; cursor: pointer; font-size: 13px; padding: 2px 4px; border-radius: 4px; }
+    .btn-icon:hover { background: var(--thumb-bg); }
   </style>
 </head>
 <body>
@@ -244,6 +257,7 @@
         </div>
         <h2 data-i18n="actions"></h2>
         <div class="group">
+          <div class="row"><span class="label"><span data-i18n="laser"></span><span class="desc" data-i18n="laserDesc"></span></span><input type="checkbox" class="switch" id="laserSwitch"></div>
           <div class="row"><span class="label"><span data-i18n="hidden"></span><span class="desc" id="hiddenDesc"></span></span><input type="checkbox" class="switch" data-key="hidden"></div>
           <div class="row"><span class="label"><span data-i18n="recall"></span><span class="desc" data-i18n="recallDesc"></span></span><button class="btn" id="recall" data-i18n="recallBtn"></button></div>
           <div class="row"><span class="label"><span data-i18n="nap"></span><span class="desc" data-i18n="napDesc"></span></span><button class="btn" id="nap" data-i18n="napBtn"></button></div>
@@ -266,6 +280,26 @@
           <div class="row"><span class="label" data-i18n="author"></span><span class="desc" style="color:var(--text)">Phanumat</span></div>
           <div class="row"><span class="label" data-i18n="license"></span><span class="desc" style="color:var(--text)">ISC License</span></div>
           <div class="row"><span class="label" data-i18n="github"></span><button class="btn" id="githubBtn" data-i18n="viewOnGithub"></button></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="coatModal" class="modal-backdrop" style="display:none">
+      <div class="modal">
+        <h2 data-i18n="coatEditor"></h2>
+        <div class="modal-preview">
+          <canvas id="coatPreviewCanvas" width="160" height="120"></canvas>
+        </div>
+        <div class="group">
+          <div class="row"><span class="label" data-i18n="baseColor"></span><input type="color" id="coatBase" value="#f5a35a"></div>
+          <div class="row"><span class="label" data-i18n="darkColor"></span><input type="color" id="coatDark" value="#d9782f"></div>
+          <div class="row"><span class="label" data-i18n="bellyColor"></span><input type="color" id="coatBelly" value="#fff3e2"></div>
+          <div class="row"><span class="label" data-i18n="eyeColor"></span><input type="color" id="coatEye" value="#6b8f2a"></div>
+          <div class="row"><span class="label" data-i18n="pattern"></span><span class="popup"><select id="coatPattern"></select><span class="arrows"></span></span></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" id="cancelCoatBtn" data-i18n="cancel"></button>
+          <button class="btn default" id="saveCoatBtn" data-i18n="save"></button>
         </div>
       </div>
     </div>

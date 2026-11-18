@@ -88,6 +88,10 @@ function syncPets() {
   }
 }
 
+let laserActive = false;
+window.moewki.onLaser?.((active) => { laserActive = !!active; if (!active && world.laser) world.laser = null; });
+window.moewki.getLaser?.().then((active) => { laserActive = !!active; });
+
 window.moewki.onWorld((data) => world.update(data, catSize().h));
 window.moewki.onSettings((s) => { settings = { ...settings, ...s }; syncPets(); });
 window.moewki.onCatArrive((a) => arrivals.set(a.id, a.from));
@@ -106,7 +110,11 @@ function setCapture(on) {
 const petAt = (x, y) => [...pets].reverse().find((p) => p.brain.hitTest(x, y));
 addEventListener('mousemove', (e) => {
   // the overlay gets forwarded moves even while click-through: cats can watch and hunt the cursor
-  if (!drag) world.mouse = { x: e.clientX, y: e.clientY, t: performance.now() };
+  if (!drag) {
+    world.mouse = { x: e.clientX, y: e.clientY, t: performance.now() };
+    if (laserActive) world.laser = { x: e.clientX, y: e.clientY, active: true, t: performance.now() };
+    else world.laser = null;
+  }
   if (drag) {
     const now = performance.now(), dt = Math.max(1, now - drag.t) / 1000;
     drag.vx = drag.vx * 0.6 + ((e.clientX - drag.lx) / dt) * 0.4;
@@ -139,7 +147,7 @@ const CALM = new Set(['sleep', 'sit', 'tuck', 'away']);
 function frameGap() {
   const shown = pets.filter((p) => !p.brain.hidden);
   if (!shown.length) return 500;
-  if (drag || shown.some((p) => FAST.has(p.brain.mode) || (p.brain.mode === 'walkTo' && p.brain.speed > 120))) return 0;
+  if (laserActive || drag || shown.some((p) => FAST.has(p.brain.mode) || (p.brain.mode === 'walkTo' && p.brain.speed > 120))) return 0;
   const cursorMoving = performance.now() - (world.mouse?.t ?? 0) < 2000; // cats watch it
   return !cursorMoving && shown.every((p) => CALM.has(p.brain.mode)) ? 100 : 33;
 }
@@ -173,6 +181,23 @@ function frame(now) {
     if (b.hidden) continue;
     cat.draw(ctx, b.x, b.y, SCALE * settings.size);
     drawn.push(catBox(b));
+  }
+  if (laserActive && world.laser) {
+    const lx = world.laser.x, ly = world.laser.y;
+    ctx.save();
+    ctx.shadowColor = '#ff0033';
+    ctx.shadowBlur = 10 * devicePixelRatio;
+    ctx.fillStyle = '#ff2244';
+    ctx.beginPath();
+    ctx.arc(lx, ly, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(lx, ly, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    drawn.push([lx - 25, ly - 25, 50, 50]);
   }
   if (DEBUG) drawDebug();
   // main polls window positions fast only while some display has busy cats

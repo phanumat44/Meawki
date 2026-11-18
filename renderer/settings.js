@@ -1,5 +1,5 @@
 import { Cat2D, COATS } from './cat2d.js';
-import { LANGUAGES, setLanguage, setPlatform, t, coatName, personalityName } from './i18n.js';
+import { LANGUAGES, setLanguage, setPlatform, t, coatName, personalityName, patternName } from './i18n.js';
 
 const MAX_CATS = 8;
 const ARROWS = '<svg viewBox="0 0 8 10" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3.8 4 1.3l2.5 2.5M1.5 6.2 4 8.7l2.5-2.5"/></svg>';
@@ -80,7 +80,10 @@ function renderCats() {
     empty.innerHTML = `<span class="label" style="color: var(--text-2)">${t('noCats')}</span>`;
     list.append(empty);
   }
-  const coats = Object.keys(COATS).map((k) => [k, coatName(k)]);
+  const coats = [
+    ...Object.keys(COATS).map((k) => [k, coatName(k)]),
+    ['custom', t('customCoat')],
+  ];
   const personalities = ['normal', 'lazy', 'hyper', 'timid'].map((k) => [k, personalityName(k)]);
   settings.cats.forEach((c, i) => {
     const row = document.createElement('div');
@@ -95,9 +98,22 @@ function renderCats() {
     nameInput.onchange = () => save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, name: nameInput.value.trim() } : k)) });
     nameInput.onmousedown = (e) => e.stopPropagation();
 
+    const coatValue = typeof c.coat === 'object' ? 'custom' : c.coat;
+    const coatWrap = popup(coats, coatValue, (coat) => {
+      if (coat === 'custom') openCoatEditor(c);
+      else save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, coat } : k)) });
+    });
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn-icon';
+    editBtn.innerHTML = '🎨';
+    editBtn.title = t('coatEditor');
+    editBtn.onclick = (e) => { e.stopPropagation(); openCoatEditor(c); };
+
     row.append(
       nameInput,
-      popup(coats, c.coat, (coat) => save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, coat } : k)) })),
+      coatWrap,
+      editBtn,
       popup(personalities, c.personality || 'normal', (personality) => save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, personality } : k)) }))
     );
     row.onmousedown = () => { selected = c.id; renderCats(); };
@@ -176,6 +192,70 @@ function renderUpdate() {
 }
 $('#updateBtn').onclick = () => (['ready', 'available'].includes(update.status) ? window.moewki.installUpdate() : window.moewki.checkForUpdate());
 window.moewki.onUpdate((u) => { update = u; renderUpdate(); });
+
+// ---------- laser & modal ----------
+window.moewki.getLaser?.().then((on) => { if ($('#laserSwitch')) $('#laserSwitch').checked = !!on; });
+window.moewki.onLaser?.((on) => { if ($('#laserSwitch')) $('#laserSwitch').checked = !!on; });
+if ($('#laserSwitch')) $('#laserSwitch').onchange = (e) => window.moewki.setLaser(e.target.checked);
+
+let editingCat = null;
+let customPreviewCat = null;
+
+function updateCoatPreview() {
+  const canvas = $('#coatPreviewCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const coatObj = {
+    base: $('#coatBase').value,
+    dark: $('#coatDark').value,
+    belly: $('#coatBelly').value,
+    eye: $('#coatEye').value,
+    pattern: $('#coatPattern').value,
+  };
+  customPreviewCat = new Cat2D(coatObj);
+  customPreviewCat.draw(ctx, canvas.width / 2, canvas.height * 0.82, 0.45);
+}
+
+function openCoatEditor(cat) {
+  editingCat = cat;
+  const currentCoat = (cat.coat && typeof cat.coat === 'object') ? cat.coat : (COATS[cat.coat] ?? COATS.orange);
+  $('#coatBase').value = currentCoat.base || '#f5a35a';
+  $('#coatDark').value = currentCoat.dark || '#d9782f';
+  $('#coatBelly').value = currentCoat.belly || '#fff3e2';
+  $('#coatEye').value = currentCoat.eye || '#6b8f2a';
+  $('#coatPattern').value = currentCoat.pattern || 'tabby';
+  $('#coatModal').style.display = 'flex';
+  updateCoatPreview();
+}
+
+const patterns = ['tabby', 'calico', 'points', 'tuxedo', 'solid'];
+for (const p of patterns) $('#coatPattern').append(new Option(patternName(p), p));
+
+for (const id of ['coatBase', 'coatDark', 'coatBelly', 'coatEye', 'coatPattern']) {
+  $(`#${id}`)?.addEventListener('input', updateCoatPreview);
+  $(`#${id}`)?.addEventListener('change', updateCoatPreview);
+}
+
+$('#saveCoatBtn').onclick = () => {
+  if (!editingCat) return;
+  const newCoat = {
+    base: $('#coatBase').value,
+    dark: $('#coatDark').value,
+    belly: $('#coatBelly').value,
+    eye: $('#coatEye').value,
+    pattern: $('#coatPattern').value,
+  };
+  $('#coatModal').style.display = 'none';
+  save({ cats: settings.cats.map((k) => (k.id === editingCat.id ? { ...k, coat: newCoat } : k)) });
+  editingCat = null;
+};
+
+$('#cancelCoatBtn').onclick = () => {
+  $('#coatModal').style.display = 'none';
+  editingCat = null;
+};
 
 // ---------- reset & about ----------
 $('#resetBtn').onclick = () => {

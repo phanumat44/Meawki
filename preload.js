@@ -3,6 +3,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('moewki', {
   onWorld: (cb) => ipcRenderer.on('world', (_e, w) => cb(w)),
   onCommand: (cb) => ipcRenderer.on('command', (_e, c) => cb(c)),
+  onLaser: (cb) => ipcRenderer.on('laser:state', (_e, on) => cb(on)),
+  setLaser: (on) => ipcRenderer.send('laser:set', on),
+  getLaser: () => ipcRenderer.invoke('laser:get'),
   onSettings: (cb) => ipcRenderer.on('settings', (_e, s) => cb(s)),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.send('settings:set', patch),

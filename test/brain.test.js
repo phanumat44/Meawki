@@ -186,3 +186,16 @@ test('Timid cat personality triggers hiss on grab', () => {
   assert.ok(sounds.includes('hiss'), 'Timid cat should hiss when grabbed');
 });
 
+test('Brain cursor recognizes active laser pointer', () => {
+  const world = new World();
+  world.laser = { x: 500, y: 300, active: true };
+  const brain = new Brain(world, () => {}, { w: 60, h: 40 });
+  brain.x = 400;
+  brain.y = 300;
+
+  const target = brain.cursor();
+  assert.ok(target, 'Cursor target should exist');
+  assert.equal(target.isLaser, true);
+  assert.equal(target.x, 500);
+});
+

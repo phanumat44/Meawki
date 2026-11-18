@@ -49,7 +49,7 @@ export class Cat2D {
 
   drawCat(ctx, x, y, scale) {
     const a = this.animator, p = a.pose;
-    const c = COATS[this.coat] ?? COATS.orange;
+    const c = (this.coat && typeof this.coat === 'object') ? this.coat : (COATS[this.coat] ?? COATS.orange);
     const ink = c.ink ?? INK;
     // facing: the animator's yaw goes -0.35 (right) .. -PI+0.35 (left); squash x through the turn
     const u = Math.min(1, Math.max(0, (a.yaw + 0.35) / (-Math.PI + 0.7)));

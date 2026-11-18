@@ -23,10 +23,15 @@ const STRINGS = {
     addFull: (max) => `มีแมวครบ ${max} ตัวแล้ว`,
     coats: { orange: 'ส้ม', calico: 'สามสี', grey: 'เทาลาย', black: 'ดำ', white: 'ขาว', siamese: 'วิเชียรมาศ', tuxedo: 'ทักซิโด้' },
     personalities: { normal: 'ปกติ', lazy: 'ขี้เกียจ', hyper: 'ซน', timid: 'ขี้กลัว' },
-    general: 'ทั่วไป', breed: 'สายพันธุ์', personality: 'นิสัย', catName: 'ชื่อ',
+    patterns: { tabby: 'ลายสลิด', calico: 'สามสี', points: 'แต้มวิเชียรมาศ', tuxedo: 'ทักซิโด้', solid: 'สีล้วน' },
+    general: 'ทั่วไป', breed: 'สายพันธุ์', personality: 'นิสัย', catName: 'ชื่อ', pattern: 'ลวดลาย',
+    customCoat: 'กำหนดสีเอง…', coatEditor: 'ปรับแต่งสีและลายขน',
+    baseColor: 'สีขนหลัก', darkColor: 'สีลาย/หู/จุด', bellyColor: 'สีท้อง/ถุงเท้า', eyeColor: 'สีตา',
+    save: 'บันทึก', cancel: 'ยกเลิก',
     sound: 'เสียง', soundEffects: 'เสียงเอฟเฟกต์', soundEffectsDesc: 'เสียงร้องเหมียว, เสียงเพอร์เมื่อลูบหัว, เสียงขู่',
     volume: 'ระดับเสียง', mute: 'เบา', loud: 'ดัง',
     timeOfDay: 'ตามเวลาของวัน', timeOfDayDesc: 'กลางคืนจะนอนบ่อยขึ้น ตอนเช้าจะตื่นมาวิ่งเล่น',
+    laser: 'โหมดเลเซอร์', laserDesc: 'เปิด/ปิดจุดเลเซอร์สีแดงให้แมววิ่งไล่กวด (Ctrl+Alt+L)',
     addTip: 'เพิ่มแมว', removeTip: 'นำแมวที่เลือกออก',
     slow: 'ช้า', fast: 'เร็ว', small: 'เล็ก', large: 'ใหญ่',
     updates: 'อัปเดต',
@@ -77,10 +82,15 @@ const STRINGS = {
     addFull: (max) => `You have the maximum of ${max} cats`,
     coats: { orange: 'Orange tabby', calico: 'Calico', grey: 'Grey tabby', black: 'Black', white: 'White', siamese: 'Siamese', tuxedo: 'Tuxedo' },
     personalities: { normal: 'Balanced', lazy: 'Lazy', hyper: 'Hyper', timid: 'Timid' },
-    general: 'General', breed: 'Breed', personality: 'Personality', catName: 'Name',
+    patterns: { tabby: 'Tabby', calico: 'Calico', points: 'Points', tuxedo: 'Tuxedo', solid: 'Solid' },
+    general: 'General', breed: 'Breed', personality: 'Personality', catName: 'Name', pattern: 'Pattern',
+    customCoat: 'Custom colors…', coatEditor: 'Custom Coat Editor',
+    baseColor: 'Body color', darkColor: 'Pattern / Ears', bellyColor: 'Belly / Paws', eyeColor: 'Eye color',
+    save: 'Save', cancel: 'Cancel',
     sound: 'Sound', soundEffects: 'Sound effects', soundEffectsDesc: 'Cute meows, purring when petted, and hissing',
     volume: 'Volume', mute: 'Quiet', loud: 'Loud',
     timeOfDay: 'Follow time of day', timeOfDayDesc: 'Sleep more at night, active zoomies in the morning',
+    laser: 'Laser pointer', laserDesc: 'Toggle red laser dot for cats to chase (Ctrl+Alt+L)',
     addTip: 'Add a cat', removeTip: 'Remove the selected cat',
     slow: 'Slow', fast: 'Fast', small: 'Small', large: 'Large',
     updates: 'Updates',
@@ -119,5 +129,6 @@ export function t(key, ...args) {
   const v = (mac ? STRINGS[current][`${key}Mac`] : undefined) ?? STRINGS[current][key] ?? STRINGS.en[key] ?? key;
   return typeof v === 'function' ? v(...args) : v;
 }
-export const coatName = (key) => STRINGS[current].coats[key] ?? key;
+export const coatName = (key) => (typeof key === 'object' ? (STRINGS[current].customCoat ?? 'กำหนดสีเอง') : (STRINGS[current].coats[key] ?? key));
 export const personalityName = (key) => STRINGS[current].personalities?.[key] ?? key;
+export const patternName = (key) => STRINGS[current].patterns?.[key] ?? key;

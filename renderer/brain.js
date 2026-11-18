@@ -327,19 +327,28 @@ export class Brain {
 
   // ---- the mouse cursor: watch it, and sometimes hunt it ----
   cursor() {
-    const m = this.world.mouse;
-    if (!m || performance.now() - m.t > 1500) return null; // only a moving cursor is interesting
+    const laser = this.world.laser?.active ? this.world.laser : null;
+    const m = laser ?? this.world.mouse;
+    if (!m || (!laser && performance.now() - m.t > 1500)) return null; // only a moving cursor is interesting
     const dx = m.x - this.x, dy = m.y - (this.y - this.size.h * 0.6);
-    return { ...m, dx, dy, dist: Math.hypot(dx, dy) };
+    return { ...m, isLaser: !!laser, dx, dy, dist: Math.hypot(dx, dy) };
   }
 
   watchCursor(dt) {
     const c = this.cursor();
-    if (c && c.dist < 450 && Math.sign(c.dx) === this.dir) {
+    if (!c) { this.look *= Math.pow(0.05, dt); return; }
+    const maxDist = c.isLaser ? 800 : 450;
+    if (c.dist < maxDist) {
+      if (Math.sign(c.dx) !== this.dir) {
+        if (c.isLaser || (c.dist < 250 && Math.random() < dt * 1.5)) {
+          return this.face(Math.sign(c.dx), () => this.set('idle', rand(0.5, 1.2)));
+        }
+      }
       this.look = clamp(Math.atan2(-c.dy, Math.abs(c.dx) + 20) * 0.7, -0.5, 0.6);
-      // close, on our ledge, still moving: pounce! (more likely when awake and standing)
-      const onLedge = Math.abs(c.y - this.y) < 60 && Math.abs(c.dx) > 50 && Math.abs(c.dx) < 380;
-      if (onLedge && Math.random() < dt * (this.mode === 'idle' ? 0.9 : 0.35)) this.hunt(c);
+      // close, on our ledge, still moving: pounce!
+      const onLedge = Math.abs(c.y - this.y) < (c.isLaser ? 90 : 60) && Math.abs(c.dx) > 30 && Math.abs(c.dx) < (c.isLaser ? 500 : 380);
+      const huntChance = c.isLaser ? (this.personality === 'hyper' ? 2.5 : this.personality === 'lazy' ? 0.6 : 1.6) : (this.mode === 'idle' ? 0.9 : 0.35);
+      if (onLedge && Math.random() < dt * huntChance) this.hunt(c);
     } else {
       this.look *= Math.pow(0.05, dt);
       if (c && c.dist < 300 && this.mode === 'idle' && Math.random() < dt * 0.5) this.face(Math.sign(c.dx), () => this.set('idle', rand(1, 2)));
