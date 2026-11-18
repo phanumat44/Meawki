@@ -106,21 +106,60 @@ addEventListener('mouseup', () => {
 });
 
 // --- loop ---
+// Every drawn frame means re-compositing a full-screen transparent window, which is most of Moewki's
+// CPU use. So draw only as often as the cats need: every frame for fast motion, 30 fps while they walk
+// and fidget, 10 fps while all of them rest, and barely at all when none is on this screen.
+const FAST = new Set(['jump', 'fall', 'held', 'crouch', 'land']);
+const CALM = new Set(['sleep', 'sit', 'tuck', 'away']);
+function frameGap() {
+  const shown = pets.filter((p) => !p.brain.hidden);
+  if (!shown.length) return 500;
+  if (drag || shown.some((p) => FAST.has(p.brain.mode) || (p.brain.mode === 'walkTo' && p.brain.speed > 120))) return 0;
+  const cursorMoving = performance.now() - (world.mouse?.t ?? 0) < 2000; // cats watch it
+  return !cursorMoving && shown.every((p) => CALM.has(p.brain.mode)) ? 100 : 33;
+}
+
+// only the areas around cats are cleared, not the whole screen
+const catBox = (b) => [b.x - b.size.w * 1.1, b.y - b.size.h * 1.9, b.size.w * 2.2, b.size.h * 2.4];
+let drawn = [];
 let last = performance.now();
+let reportedActive = null;
+let paused = false, looping = true;
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000) * settings.speed;
+  if (paused) { looping = false; return; } // the window is hidden: stop until it is shown again
+  requestAnimationFrame(frame);
+  const gap = frameGap();
+  if (now - last < gap - 4) return; // a little slack for vsync jitter
+  let dt = Math.min(0.5, (now - last) / 1000) * settings.speed;
   last = now;
+  // fixed small steps keep physics and timers the same at any frame rate
+  while (dt > 0) {
+    const step = Math.min(0.05, dt);
+    dt -= step;
+    for (const { brain: b, cat } of pets) {
+      b.update(step);
+      cat.animator.update(step, b.animMode, { dir: b.dir, speed: b.animSpeed, vy: b.vy, look: b.look, snappy: b.mode === 'land' });
+    }
+  }
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-  ctx.clearRect(0, 0, innerWidth, innerHeight);
+  for (const r of drawn) ctx.clearRect(...r);
+  drawn = [];
   for (const { brain: b, cat } of pets) {
-    b.update(dt);
-    cat.animator.update(dt, b.animMode, { dir: b.dir, speed: b.animSpeed, vy: b.vy, look: b.look, snappy: b.mode === 'land' });
-    if (!b.hidden) cat.draw(ctx, b.x, b.y, SCALE * settings.size);
+    if (b.hidden) continue;
+    cat.draw(ctx, b.x, b.y, SCALE * settings.size);
+    drawn.push(catBox(b));
   }
   if (DEBUG) drawDebug();
-  requestAnimationFrame(frame);
+  // main polls window positions fast only while some display has busy cats
+  const active = gap <= 33;
+  if (active !== reportedActive) { reportedActive = active; window.moewki.setActivity(active); }
 }
 requestAnimationFrame(frame);
+// while hidden the cats are frozen, and pick up where they were when shown again
+window.moewki.onVisible((visible) => {
+  paused = !visible;
+  if (visible && !looping) { looping = true; last = performance.now(); requestAnimationFrame(frame); }
+});
 
 function drawDebug() {
   dctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);

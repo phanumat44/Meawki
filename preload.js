@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('moewki', {
   command: (c) => ipcRenderer.send('command', c),
   windowAction: (action) => ipcRenderer.send('window', action),
   setIgnoreMouse: (ignore) => ipcRenderer.send('set-ignore-mouse', ignore),
+  setActivity: (active) => ipcRenderer.send('activity', active),
+  onVisible: (cb) => ipcRenderer.on('overlay:visible', (_e, v) => cb(v)),
   // multi-monitor: hand a cat to the display next door / hear that one is coming in
   leaveCat: (id, side) => ipcRenderer.invoke('cat:leave', { id, side }),
   onCatArrive: (cb) => ipcRenderer.on('cat:arrive', (_e, a) => cb(a)),

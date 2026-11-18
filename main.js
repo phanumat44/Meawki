@@ -12,6 +12,9 @@ let tray, pollTimer, fullscreenTimer, settingsWin;
 let hiddenByFullscreen = false;
 // one transparent overlay per display; each cat lives on one of them at a time
 const overlays = new Map(); // display id -> { win, display, hwnd }
+const activeOverlays = new Set(); // displays whose cats are moving (they report it)
+let windowsChangedAt = 0;
+let lastWindowsKey = '';
 let catOwners = new Map();  // cat id -> display id
 
 // --- settings, saved in the user's app data folder ---
@@ -122,8 +125,10 @@ function applyVisibility() {
     if (show && !win.isVisible()) {
       win.showInactive(); // never take focus from what the user is doing
       win.setAlwaysOnTop(true, 'screen-saver');
+      sendTo(win, 'overlay:visible', true);
     } else if (!show && win.isVisible()) {
       win.hide();
+      sendTo(win, 'overlay:visible', false); // a hidden window would otherwise keep drawing at full speed
     }
   }
 }
@@ -181,7 +186,7 @@ function createOverlay(display) {
 function syncOverlays() {
   const displays = screen.getAllDisplays();
   for (const [id, o] of overlays) {
-    if (!displays.some((d) => d.id === id)) { o.win.destroy(); overlays.delete(id); }
+    if (!displays.some((d) => d.id === id)) { o.win.destroy(); overlays.delete(id); activeOverlays.delete(id); }
   }
   for (const d of displays) {
     const o = overlays.get(d.id);
@@ -190,6 +195,14 @@ function syncOverlays() {
   }
   applyVisibility();
   broadcastSettings(); // re-home cats from screens that went away
+}
+
+// Poll window positions 30 times a second while cats are busy or windows are moving (cats ride along
+// on dragged windows), 5 times a second otherwise, and not at all while the cats are hidden.
+function schedulePoll() {
+  const visible = [...overlays.values()].some((o) => o.win.isVisible());
+  const busy = activeOverlays.size > 0 || Date.now() - windowsChangedAt < 1500;
+  pollTimer = setTimeout(() => { if (visible) pollWindows(); schedulePoll(); }, !visible ? 500 : busy ? 33 : 200);
 }
 
 function pollWindows() {
@@ -201,6 +214,8 @@ function pollWindows() {
       : screen.screenToDipRect(null, { x: w.x, y: w.y, width: w.w, height: w.h });
     return { id: w.id, title: w.title, x: r.x, y: r.y, w: r.width, h: r.height };
   });
+  const key = windows.map((w) => `${w.id}:${w.x},${w.y},${w.w},${w.h}`).join('|');
+  if (key !== lastWindowsKey) { lastWindowsKey = key; windowsChangedAt = Date.now(); }
   for (const o of overlays.values()) {
     if (o.win.isVisible()) sendTo(o.win, 'world', worldFor(o.display, windows, displays));
   }
@@ -222,6 +237,10 @@ const overlayOf = (sender) => [...overlays.entries()].find(([, o]) => o.win.webC
 
 ipcMain.on('set-ignore-mouse', (e, ignore) => {
   overlayOf(e.sender)?.[1].win.setIgnoreMouseEvents(ignore, { forward: true });
+});
+ipcMain.on('activity', (e, active) => {
+  const entry = overlayOf(e.sender);
+  if (entry) active ? activeOverlays.add(entry[0]) : activeOverlays.delete(entry[0]);
 });
 ipcMain.handle('cat:leave', (e, { id, side }) => {
   const entry = overlayOf(e.sender);
@@ -262,7 +281,7 @@ if (IS_MAC) app.dock?.hide(); // a menu bar app: no Dock icon while only the cat
 app.whenReady().then(() => {
   loadSettings();
   syncOverlays();
-  pollTimer = setInterval(pollWindows, 33);
+  schedulePoll();
   for (const ev of ['display-added', 'display-removed', 'display-metrics-changed']) screen.on(ev, syncOverlays);
   tray = new Tray(trayIcon());
   tray.setToolTip('Moewki');
@@ -281,5 +300,5 @@ app.whenReady().then(() => {
 
 // closing the settings window must not quit the app
 app.on('window-all-closed', (e) => e.preventDefault?.());
-app.on('before-quit', () => { clearInterval(pollTimer); clearInterval(fullscreenTimer); });
+app.on('before-quit', () => { clearTimeout(pollTimer); clearInterval(fullscreenTimer); });
 app.on('will-quit', () => globalShortcut.unregisterAll());
