@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('moewki', {
   onSettings: (cb) => ipcRenderer.on('settings', (_e, s) => cb(s)),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.send('settings:set', patch),
+  resetSettings: () => ipcRenderer.send('settings:reset'),
+  openExternal: (url) => ipcRenderer.send('open:external', url),
   getAccent: () => ipcRenderer.invoke('system:accent'),
   onAccent: (cb) => ipcRenderer.on('accent', (_e, c) => cb(c)),
   command: (c) => ipcRenderer.send('command', c),

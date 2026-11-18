@@ -102,7 +102,7 @@ function openSettings() {
       ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 20, y: 20 }, vibrancy: 'sidebar',
           visualEffectState: 'followWindow', backgroundColor: '#00000000' }
       : { frame: false, backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#f6f6f6' }),
-    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), sandbox: true },
   });
   settingsWin.loadFile(path.join(__dirname, 'renderer', 'settings.html'), { query: { platform: IS_MAC ? 'mac' : 'win' } });
   settingsWin.once('ready-to-show', () => settingsWin.show());
@@ -173,7 +173,7 @@ function createOverlay(display) {
     skipTaskbar: true, focusable: false, hasShadow: false, alwaysOnTop: true,
     enableLargerThanScreen: true, roundedCorners: false, show: false,
     backgroundColor: '#00000000',
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false, sandbox: true },
   });
   win.setAlwaysOnTop(true, 'screen-saver');
   win.setIgnoreMouseEvents(true, { forward: true });
@@ -269,6 +269,17 @@ ipcMain.on('settings:set', (_e, patch) => {
   if ('lang' in patch) buildTrayMenu();
   if ('hideFromCapture' in patch) for (const o of overlays.values()) o.win.setContentProtection(!!patch.hideFromCapture);
   if ('autoHide' in patch && !patch.autoHide) { hiddenByFullscreen = false; applyVisibility(); }
+});
+ipcMain.on('settings:reset', () => {
+  const currentLang = settings.lang;
+  settings = { ...DEFAULTS, lang: currentLang };
+  saveSettings();
+  broadcastSettings();
+});
+ipcMain.on('open:external', (_e, url) => {
+  if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+    shell.openExternal(url);
+  }
 });
 ipcMain.on('command', (_e, c) => toAllOverlays('command', c));
 ipcMain.handle('app:version', () => app.getVersion());

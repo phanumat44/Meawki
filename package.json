@@ -43,7 +43,8 @@
       "assets/**",
       "!assets/icon-src/**",
       "!assets/icon-1024.png",
-      "package.json"
+      "package.json",
+      "LICENSE"
     ],
     "win": {
       "target": [
