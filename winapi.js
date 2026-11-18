@@ -63,8 +63,9 @@ function listWindows(excludeIds = new Set()) {
   return out;
 }
 
-// QUNS_BUSY (full-screen app), QUNS_RUNNING_D3D_FULL_SCREEN (game), QUNS_PRESENTATION_MODE
-const BUSY_STATES = new Set([2, 3, 4]);
+// QUNS_RUNNING_D3D_FULL_SCREEN (game) and QUNS_PRESENTATION_MODE. Not QUNS_BUSY (2): Windows reports
+// that for our own topmost full-screen overlay, so hiding on it made the cats blink on and off.
+const BUSY_STATES = new Set([3, 4]);
 const MONITOR_DEFAULTTONEAREST = 2;
 
 // True while something full screen is in front: a game, a presentation, or a window (video, F11 browser)
