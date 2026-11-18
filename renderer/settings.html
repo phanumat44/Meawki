@@ -125,6 +125,8 @@
     /* push button */
     .btn { height: 22px; padding: 0 12px; border: 0; border-radius: 5px; background: var(--control); box-shadow: var(--control-shadow); }
     .btn:active { filter: brightness(0.93); }
+    .btn.default { background: var(--accent); color: #fff; }
+    .btn:disabled { color: var(--text-3); filter: none; }
 
     /* pop-up button */
     .popup { position: relative; display: inline-flex; }
@@ -206,6 +208,10 @@
         <div class="group">
           <div class="row"><span class="label"><span data-i18n="language"></span><span class="desc" data-i18n="languageDesc"></span></span>
             <span class="popup"><select id="lang"></select><span class="arrows"></span></span></div>
+        </div>
+        <h2 data-i18n="updates"></h2>
+        <div class="group">
+          <div class="row"><span class="label"><span id="appVersion">Moewki</span><span class="desc" id="updateDesc"></span></span><button class="btn" id="updateBtn"></button></div>
         </div>
         <h2 data-i18n="startup"></h2>
         <div class="group">
@@ -373,6 +379,23 @@ window.moewki.onSettings((s) => {
   renderControls();
 });
 
+// ---------- updates ----------
+let update = await window.moewki.getUpdate();
+window.moewki.getVersion().then((v) => { $('#appVersion').textContent = `Moewki ${v}`; });
+function renderUpdate() {
+  const u = update, btn = $('#updateBtn');
+  const desc = {
+    dev: t('upDev'), idle: t('upIdle'), checking: t('upChecking'), latest: t('upLatest'), error: t('upError'),
+    downloading: t('upDownloading', u.version, u.progress), ready: t('upReady', u.version), available: t('upAvailable', u.version),
+  }[u.status] ?? '';
+  $('#updateDesc').textContent = desc;
+  btn.textContent = u.status === 'ready' ? t('installBtn') : u.status === 'available' ? t('downloadBtn') : t('checkBtn');
+  btn.classList.toggle('default', u.status === 'ready' || u.status === 'available');
+  btn.disabled = ['dev', 'checking', 'downloading'].includes(u.status);
+}
+$('#updateBtn').onclick = () => (['ready', 'available'].includes(update.status) ? window.moewki.installUpdate() : window.moewki.checkForUpdate());
+window.moewki.onUpdate((u) => { update = u; renderUpdate(); });
+
 // ---------- language ----------
 const uiLang = () => (settings.lang in LANGUAGES ? settings.lang : 'en');
 let appliedLang = null;
@@ -385,6 +408,7 @@ function applyLanguage() {
   $('#hiddenDesc').textContent = t('hiddenDesc', platform === 'mac' ? '⌃⌥H' : 'Ctrl+Alt+H');
   $('#title').textContent = t(page);
   renderCats();
+  renderUpdate();
 }
 
 applyLanguage();

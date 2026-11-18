@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, globalShortcut, nativeTheme, systemPreferences } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, globalShortcut, nativeTheme, systemPreferences, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -6,6 +6,7 @@ const IS_MAC = process.platform === 'darwin';
 const winapi = IS_MAC ? require('./macapi') : require('./winapi');
 const { listWindows } = winapi;
 const { worldFor, neighbours, assignCats } = require('./layout');
+const updater = require('./updater');
 const HIDE_SHORTCUT = 'Control+Alt+H'; // Ctrl+Option+H on macOS (Cmd+Option+H is "hide others" there)
 
 let tray, pollTimer, fullscreenTimer, settingsWin;
@@ -55,12 +56,20 @@ function sendTo(win, channel, data) {
 const toAllOverlays = (channel, data) => { for (const o of overlays.values()) sendTo(o.win, channel, data); };
 
 const TRAY_TEXT = {
-  th: { settings: 'การตั้งค่า…', hide: 'ซ่อนแมว', recall: 'เรียกแมวกลับมา', nap: 'ให้แมวนอน', quit: 'ออกจาก Moewki' },
-  en: { settings: 'Settings…', hide: 'Hide cats', recall: 'Call cats back', nap: 'Nap time', quit: 'Quit Moewki' },
+  th: { settings: 'การตั้งค่า…', hide: 'ซ่อนแมว', recall: 'เรียกแมวกลับมา', nap: 'ให้แมวนอน', quit: 'ออกจาก Moewki',
+    updateReady: (v) => `รีสตาร์ตเพื่ออัปเดตเป็น ${v}`, updateAvailable: (v) => `ดาวน์โหลด Moewki ${v}…`,
+    notifyReady: (v) => `เวอร์ชัน ${v} พร้อมแล้ว คลิกเพื่อรีสตาร์ตและอัปเดต`, notifyAvailable: (v) => `มี Moewki ${v} แล้ว คลิกเพื่อดาวน์โหลด` },
+  en: { settings: 'Settings…', hide: 'Hide cats', recall: 'Call cats back', nap: 'Nap time', quit: 'Quit Moewki',
+    updateReady: (v) => `Restart to update to ${v}`, updateAvailable: (v) => `Download Moewki ${v}…`,
+    notifyReady: (v) => `Version ${v} is ready. Click to restart and update.`, notifyAvailable: (v) => `Moewki ${v} is out. Click to download.` },
 };
 function buildTrayMenu() {
   const tx = TRAY_TEXT[settings.lang] ?? TRAY_TEXT.en;
+  const up = updater.getState();
+  const updateItem = up.status === 'ready' ? [{ label: tx.updateReady(up.version), click: updater.install }, { type: 'separator' }]
+    : up.status === 'available' ? [{ label: tx.updateAvailable(up.version), click: updater.install }, { type: 'separator' }] : [];
   tray.setContextMenu(Menu.buildFromTemplate([
+    ...updateItem,
     { label: tx.settings, accelerator: IS_MAC ? 'Command+,' : undefined, click: openSettings },
     { type: 'separator' },
     { label: tx.hide, type: 'checkbox', checked: !!settings.hidden, accelerator: HIDE_SHORTCUT, registerAccelerator: false,
@@ -262,6 +271,25 @@ ipcMain.on('settings:set', (_e, patch) => {
   if ('autoHide' in patch && !patch.autoHide) { hiddenByFullscreen = false; applyVisibility(); }
 });
 ipcMain.on('command', (_e, c) => toAllOverlays('command', c));
+ipcMain.handle('app:version', () => app.getVersion());
+ipcMain.handle('update:get', () => updater.getState());
+ipcMain.on('update:check', () => updater.check());
+ipcMain.on('update:install', () => updater.install());
+
+// Tell the settings window and tray about update progress; announce a new version once.
+let announced = null;
+function onUpdateState(state) {
+  if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('update', state);
+  if (!tray) return;
+  buildTrayMenu();
+  if ((state.status === 'ready' || state.status === 'available') && announced !== state.version && Notification.isSupported()) {
+    announced = state.version;
+    const tx = TRAY_TEXT[settings.lang] ?? TRAY_TEXT.en;
+    const note = new Notification({ title: 'Moewki', body: state.status === 'ready' ? tx.notifyReady(state.version) : tx.notifyAvailable(state.version) });
+    note.on('click', updater.install);
+    note.show();
+  }
+}
 // title bar buttons drawn by the settings page on Windows
 ipcMain.on('window', (e, action) => {
   const w = BrowserWindow.fromWebContents(e.sender);
@@ -277,6 +305,7 @@ if (!app.requestSingleInstanceLock()) {
 app.on('second-instance', () => openSettings());
 
 if (IS_MAC) app.dock?.hide(); // a menu bar app: no Dock icon while only the cats are showing
+if (process.platform === 'win32') app.setAppUserModelId('com.phanumat.moewki'); // needed for notifications
 
 app.whenReady().then(() => {
   loadSettings();
@@ -292,6 +321,7 @@ app.whenReady().then(() => {
   });
   if (process.argv.includes('--settings')) openSettings();
   watchFullscreen();
+  updater.start(onUpdateState);
   const shortcuts = { 'CommandOrControl+Alt+Q': () => app.quit(), [HIDE_SHORTCUT]: () => setHidden(!settings.hidden) };
   for (const [keys, fn] of Object.entries(shortcuts)) {
     if (!globalShortcut.register(keys, fn)) console.warn(`shortcut ${keys} is taken by another app`);

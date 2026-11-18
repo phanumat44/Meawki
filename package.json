@@ -9,13 +9,15 @@
     "icon": "electron scripts/build-icon.js",
     "test": "node --test",
     "dist": "electron-builder",
-    "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac"
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "release:win": "electron-builder --win --publish always"
   },
   "keywords": [],
   "author": "Phanumat",
   "license": "ISC",
   "dependencies": {
+    "electron-updater": "^6.8.11",
     "koffi": "^3.3.7"
   },
   "devDependencies": {
@@ -35,6 +37,7 @@
       "winapi.js",
       "macapi.js",
       "layout.js",
+      "updater.js",
       "renderer/**",
       "assets/**",
       "!assets/icon-src/**",
@@ -51,7 +54,8 @@
       "oneClick": true,
       "perMachine": false,
       "shortcutName": "Moewki",
-      "uninstallDisplayName": "Moewki"
+      "uninstallDisplayName": "Moewki",
+      "artifactName": "Moewki-Setup-${version}.${ext}"
     },
     "mac": {
       "target": [
@@ -61,7 +65,16 @@
       "category": "public.app-category.entertainment",
       "extendInfo": {
         "LSUIElement": true
+      },
+      "artifactName": "Moewki-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "phanumat44",
+        "repo": "Meawki",
+        "releaseType": "release"
       }
-    }
+    ]
   }
 }
