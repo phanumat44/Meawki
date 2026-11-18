@@ -61,7 +61,7 @@ function popup(options, value, onChange) {
 
 function portrait(coat) {
   const canvas = document.createElement('canvas');
-  canvas.width = 40 * devicePixelRatio; canvas.height = 30 * devicePixelRatio;
+  canvas.width = 54 * devicePixelRatio; canvas.height = 46 * devicePixelRatio;
   const cat = new Cat2D(coat);
   cat.animator.t = Math.random() * 10;
   portraits.add({ canvas, cat });
@@ -72,70 +72,116 @@ function renderCats() {
   const list = $('#catList');
   for (const p of [...portraits]) if (list.contains(p.canvas)) portraits.delete(p);
   list.replaceChildren();
-  if (!settings.cats.some((c) => c.id === selected)) selected = settings.cats.at(-1)?.id ?? null;
 
   if (!settings.cats.length) {
     const empty = document.createElement('div');
-    empty.className = 'row';
-    empty.innerHTML = `<span class="label" style="color: var(--text-2)">${t('noCats')}</span>`;
+    empty.className = 'cat-card';
+    empty.style.justifyContent = 'center';
+    empty.innerHTML = `<span style="color: var(--text-2); font-size: 13px;">${t('noCats')}</span>`;
     list.append(empty);
   }
+
   const coats = [
     ...Object.keys(COATS).map((k) => [k, coatName(k)]),
     ['custom', t('customCoat')],
   ];
   const personalities = ['normal', 'lazy', 'hyper', 'timid'].map((k) => [k, personalityName(k)]);
+
   settings.cats.forEach((c, i) => {
-    const row = document.createElement('div');
-    row.className = 'row selectable' + (c.id === selected ? ' sel' : '');
-    row.append(portrait(c.coat));
+    const card = document.createElement('div');
+    card.className = 'cat-card';
+    card.dataset.id = c.id;
+
+    // Portrait / Avatar
+    const portraitWrap = document.createElement('div');
+    portraitWrap.className = 'cat-card-portrait';
+    portraitWrap.append(portrait(c.coat));
+
+    // Body container
+    const body = document.createElement('div');
+    body.className = 'cat-card-body';
+
+    // Top: Name + Delete button
+    const top = document.createElement('div');
+    top.className = 'cat-card-top';
 
     const nameInput = document.createElement('input');
     nameInput.className = 'cat-name-input';
     nameInput.value = c.name || '';
     nameInput.placeholder = t('catN', i + 1);
     nameInput.title = t('catName');
+    nameInput.maxLength = 24;
     nameInput.onchange = () => save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, name: nameInput.value.trim() } : k)) });
-    nameInput.onmousedown = (e) => e.stopPropagation();
 
-    const coatValue = typeof c.coat === 'object' ? 'custom' : c.coat;
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'cat-btn-delete';
+    deleteBtn.title = t('deleteCat');
+    deleteBtn.disabled = settings.cats.length <= 1;
+    deleteBtn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h10M6 7v5M10 7v5M5 4l.5 9a1.5 1.5 0 0 0 1.5 1.5h2a1.5 1.5 0 0 0 1.5-1.5L11 4M6 4V2.5A1.5 1.5 0 0 1 7.5 1h1A1.5 1.5 0 0 1 10 2.5V4"/></svg>';
+    deleteBtn.onclick = () => {
+      save({ cats: settings.cats.filter((k) => k.id !== c.id) });
+    };
+
+    top.append(nameInput, deleteBtn);
+
+    // Controls: Breed & Personality
+    const controls = document.createElement('div');
+    controls.className = 'cat-card-controls';
+
+    // Breed selector
+    const breedField = document.createElement('div');
+    breedField.className = 'cat-field';
+    const breedLabel = document.createElement('span');
+    breedLabel.className = 'cat-field-label';
+    breedLabel.textContent = t('catBreed') + ':';
+
+    const isCustom = typeof c.coat === 'object' || c.coat === 'custom';
+    const coatValue = isCustom ? 'custom' : c.coat;
+
     const coatWrap = popup(coats, coatValue, (coat) => {
       if (coat === 'custom') openCoatEditor(c);
       else save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, coat } : k)) });
     });
 
     const editBtn = document.createElement('button');
-    editBtn.className = 'btn-icon';
-    editBtn.innerHTML = '🎨';
+    editBtn.className = 'cat-btn-paint';
+    editBtn.innerHTML = '🎨 ' + t('editCoat');
     editBtn.title = t('coatEditor');
-    editBtn.onclick = (e) => { e.stopPropagation(); openCoatEditor(c); };
+    editBtn.style.display = isCustom ? 'inline-flex' : 'none';
+    editBtn.onclick = () => openCoatEditor(c);
 
-    row.append(
-      nameInput,
-      coatWrap,
-      editBtn,
-      popup(personalities, c.personality || 'normal', (personality) => save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, personality } : k)) }))
-    );
-    row.onmousedown = () => { selected = c.id; renderCats(); };
-    list.append(row);
+    breedField.append(breedLabel, coatWrap, editBtn);
+
+    // Personality selector
+    const persField = document.createElement('div');
+    persField.className = 'cat-field';
+    const persLabel = document.createElement('span');
+    persLabel.className = 'cat-field-label';
+    persLabel.textContent = t('personalityLabel') + ':';
+
+    const persWrap = popup(personalities, c.personality || 'normal', (personality) => {
+      save({ cats: settings.cats.map((k) => (k.id === c.id ? { ...k, personality } : k)) });
+    });
+
+    persField.append(persLabel, persWrap);
+
+    controls.append(breedField, persField);
+    body.append(top, controls);
+    card.append(portraitWrap, body);
+    list.append(card);
   });
-  $('#addCat').disabled = settings.cats.length >= MAX_CATS;
-  $('#removeCat').disabled = !selected;
-  $('#addCat').title = t('addTip');
-  $('#removeCat').title = t('removeTip');
-  $('#catNote').textContent = t(settings.cats.length >= MAX_CATS ? 'addFull' : 'addDesc', MAX_CATS);
+
+  const isFull = settings.cats.length >= MAX_CATS;
+  $('#addCat').disabled = isFull;
+  $('#addCatText').textContent = t('addNewCat');
+  $('#addCatCount').textContent = t('catCountBadge', settings.cats.length, MAX_CATS);
+  $('#catNote').textContent = t(isFull ? 'addFull' : 'addDesc', MAX_CATS);
 }
 
 $('#addCat').onclick = () => {
-  const id = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; // unique even for quick double clicks
-  selected = id;
+  if (settings.cats.length >= MAX_CATS) return;
+  const id = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   save({ cats: [...settings.cats, { id, name: '', coat: 'orange', personality: 'normal' }] });
-};
-$('#removeCat').onclick = () => {
-  const i = settings.cats.findIndex((c) => c.id === selected);
-  const cats = settings.cats.filter((c) => c.id !== selected);
-  selected = cats[Math.min(i, cats.length - 1)]?.id ?? null;
-  save({ cats });
 };
 
 // ---------- other controls ----------
@@ -238,6 +284,19 @@ for (const id of ['coatBase', 'coatDark', 'coatBelly', 'coatEye', 'coatPattern']
   $(`#${id}`)?.addEventListener('change', updateCoatPreview);
 }
 
+for (const chip of document.querySelectorAll('.chip[data-preset]')) {
+  chip.onclick = () => {
+    const preset = COATS[chip.dataset.preset];
+    if (!preset) return;
+    $('#coatBase').value = preset.base;
+    $('#coatDark').value = preset.dark;
+    $('#coatBelly').value = preset.belly;
+    $('#coatEye').value = preset.eye;
+    $('#coatPattern').value = preset.pattern;
+    updateCoatPreview();
+  };
+}
+
 $('#saveCoatBtn').onclick = () => {
   if (!editingCat) return;
   const newCoat = {
@@ -297,7 +356,7 @@ function frame(now) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     cat.animator.update(dt, 'idle', { dir: 1 });
     ctx.scale(devicePixelRatio, devicePixelRatio);
-    cat.draw(ctx, 21, 27, 0.24);
+    cat.draw(ctx, 27, 40, 0.30);
   }
   requestAnimationFrame(frame);
 }

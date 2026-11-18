@@ -108,20 +108,191 @@
     .note { color: var(--text-2); font-size: 11px; margin: 6px 2px 0; }
     /* Thai glyphs need a touch more size than Latin to read comfortably at caption size */
     :lang(th) .row .desc, :lang(th) .note { font-size: 12px; line-height: 15px; }
-    .row.selectable.sel { background: var(--accent); color: #fff; }
-    .row.selectable.sel::before, .row.selectable.sel + .row::before { opacity: 0; }
-    body.inactive .row.selectable.sel { background: var(--select-inactive); color: var(--text); }
-    .row canvas { width: 40px; height: 30px; border-radius: 6px; background: var(--thumb-bg); flex: none; }
-    .row.selectable.sel canvas { background: rgba(255, 255, 255, 0.18); }
 
-    /* +/- bar under a list, as in macOS settings panes */
-    .listbar { display: flex; border-top: 1px solid var(--separator); height: 24px; }
-    .listbar button { width: 26px; border: 0; background: none; display: grid; place-items: center; color: var(--text); }
-    .listbar button + button { border-left: 1px solid var(--separator); }
-    .listbar button:last-child { border-right: 1px solid var(--separator); }
-    .listbar button:active { background: var(--separator); }
-    .listbar button:disabled { color: var(--text-3); background: none; }
-    .listbar svg { width: 10px; height: 10px; }
+    /* Modern Cat Cards System */
+    .cat-list { display: flex; flex-direction: column; gap: 8px; }
+    .cat-card {
+      background: var(--group);
+      border: 1px solid var(--group-border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      transition: all 0.18s ease;
+      position: relative;
+    }
+    .cat-card:hover {
+      border-color: rgba(0, 122, 255, 0.35);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      transform: translateY(-1px);
+    }
+    .cat-card-portrait {
+      width: 58px;
+      height: 50px;
+      border-radius: 8px;
+      background: var(--thumb-bg);
+      border: 1px solid var(--group-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+    .cat-card-portrait canvas {
+      width: 54px;
+      height: 46px;
+    }
+    .cat-card-body {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .cat-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .cat-name-input {
+      font-size: 13px;
+      font-weight: 600;
+      height: 24px;
+      padding: 2px 8px;
+      border-radius: 5px;
+      border: 1px solid var(--group-border);
+      background: var(--control);
+      color: var(--text);
+      max-width: 200px;
+      flex: 1;
+      transition: all 0.15s ease;
+    }
+    .cat-name-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.25);
+    }
+    .cat-btn-delete {
+      width: 24px;
+      height: 24px;
+      border-radius: 5px;
+      border: 0;
+      background: transparent;
+      color: var(--text-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex: none;
+    }
+    .cat-btn-delete:hover:not(:disabled) {
+      background: rgba(255, 59, 48, 0.15);
+      color: #ff3b30;
+    }
+    .cat-btn-delete:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+    }
+    .cat-card-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .cat-field {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cat-field-label {
+      font-size: 11px;
+      color: var(--text-2);
+      font-weight: 500;
+      width: 82px;
+      flex: none;
+      white-space: nowrap;
+    }
+    .cat-btn-paint {
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 5px;
+      border: 1px solid var(--group-border);
+      background: var(--control);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .cat-btn-paint:hover {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+    }
+    .add-cat-card {
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      border-radius: 10px;
+      border: 1.5px dashed var(--separator);
+      background: var(--thumb-bg);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .add-cat-card:hover:not(:disabled) {
+      border-color: var(--accent);
+      background: rgba(0, 122, 255, 0.08);
+      transform: translateY(-1px);
+    }
+    .add-cat-card:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    .add-cat-card:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      color: var(--text-3);
+      border-style: solid;
+      background: transparent;
+      transform: none;
+    }
+    .add-cat-card .count {
+      font-size: 12px;
+      color: var(--text-2);
+      font-weight: normal;
+    }
+    .preset-chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--group-border);
+      background: var(--control);
+      cursor: pointer;
+      color: var(--text);
+      transition: all 0.12s ease;
+    }
+    .chip:hover {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+    }
 
     /* push button */
     .btn { height: 22px; padding: 0 12px; border: 0; border-radius: 5px; background: var(--control); box-shadow: var(--control-shadow); }
@@ -202,14 +373,13 @@
     <header class="toolbar"><h1 id="title"></h1></header>
     <div class="pages">
       <div class="page" data-page="cats">
-        <div class="group">
-          <div id="catList"></div>
-          <div class="listbar">
-            <button id="addCat"><svg viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M5 1v8M1 5h8"/></svg></button>
-            <button id="removeCat"><svg viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M1 5h8"/></svg></button>
-          </div>
-        </div>
-        <p class="note" id="catNote"></p>
+        <div id="catList" class="cat-list"></div>
+        <button id="addCat" class="add-cat-card">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v12M2 8h12"/></svg>
+          <span id="addCatText">เพิ่มน้องแมวตัวใหม่</span>
+          <span id="addCatCount" class="count"></span>
+        </button>
+        <p class="note" id="catNote" style="text-align: center; margin-top: 12px;"></p>
       </div>
 
       <div class="page" data-page="behaviour">
@@ -289,6 +459,14 @@
         <h2 data-i18n="coatEditor"></h2>
         <div class="modal-preview">
           <canvas id="coatPreviewCanvas" width="160" height="120"></canvas>
+        </div>
+        <div class="preset-chips">
+          <span style="font-size: 11px; color: var(--text-2);" data-i18n="presetCopy"></span>
+          <button type="button" class="chip" data-preset="orange">ส้ม</button>
+          <button type="button" class="chip" data-preset="calico">สามสี</button>
+          <button type="button" class="chip" data-preset="siamese">วิเชียรมาศ</button>
+          <button type="button" class="chip" data-preset="tuxedo">ทักซิโด้</button>
+          <button type="button" class="chip" data-preset="grey">เทาลาย</button>
         </div>
         <div class="group">
           <div class="row"><span class="label" data-i18n="baseColor"></span><input type="color" id="coatBase" value="#f5a35a"></div>

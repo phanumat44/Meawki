@@ -107,7 +107,7 @@ function trayIcon() {
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); return settingsWin.focus(); }
   settingsWin = new BrowserWindow({
-    width: 720, height: 480, resizable: false, maximizable: false, fullscreenable: false,
+    width: 760, height: 530, resizable: false, maximizable: false, fullscreenable: false,
     title: 'Moewki', icon: path.join(__dirname, 'assets', IS_MAC ? 'icon.png' : 'icon.ico'),
     show: false,
     ...(IS_MAC
