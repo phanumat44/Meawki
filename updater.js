@@ -21,6 +21,7 @@ function start(onChange) {
   listener = onChange;
   if (!app.isPackaged) return; // `npm start` has nothing to update
   updater = require('electron-updater').autoUpdater;
+  updater.logger = console;
   updater.autoDownload = !IS_MAC;
   updater.autoInstallOnAppQuit = true;
   updater.on('checking-for-update', () => set({ status: 'checking' }));
@@ -28,14 +29,20 @@ function start(onChange) {
   updater.on('update-available', (info) => set({ status: IS_MAC ? 'available' : 'downloading', version: info.version, progress: 0 }));
   updater.on('download-progress', (p) => set({ status: 'downloading', progress: Math.round(p.percent) }));
   updater.on('update-downloaded', (info) => set({ status: 'ready', version: info.version }));
-  updater.on('error', () => set({ status: 'error' }));
+  updater.on('error', (err) => {
+    console.error('[Moewki Updater Error]', err);
+    set({ status: 'error' });
+  });
   check();
   setInterval(check, CHECK_EVERY);
 }
 
 function check() {
   if (!updater || ['checking', 'downloading', 'ready'].includes(state.status)) return;
-  updater.checkForUpdates().catch(() => set({ status: 'error' }));
+  updater.checkForUpdates().catch((err) => {
+    console.error('[Moewki Updater Check Error]', err);
+    set({ status: 'error' });
+  });
 }
 
 // Restart into the downloaded version, or (macOS) open the release page.

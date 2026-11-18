@@ -11,7 +11,8 @@
     "dist": "electron-builder",
     "dist:win": "electron-builder --win --publish never",
     "dist:mac": "electron-builder --mac --publish never",
-    "release:win": "electron-builder --win --publish always"
+    "release:win": "electron-builder --win --publish always",
+    "release:mac": "electron-builder --mac --publish always"
   },
   "keywords": [],
   "author": "Phanumat",
