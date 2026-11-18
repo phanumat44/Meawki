@@ -7,13 +7,61 @@
     "start": "electron .",
     "debug": "electron . --cat-debug --devtools",
     "icon": "electron scripts/build-icon.js",
-    "test": "node --test"
+    "test": "node --test",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac"
   },
   "keywords": [],
-  "author": "",
+  "author": "Phanumat",
   "license": "ISC",
   "dependencies": {
-    "electron": "^45.2.3",
     "koffi": "^3.3.7"
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0"
+  },
+  "productName": "Moewki",
+  "build": {
+    "appId": "com.phanumat.moewki",
+    "productName": "Moewki",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "winapi.js",
+      "macapi.js",
+      "layout.js",
+      "renderer/**",
+      "assets/**",
+      "!assets/icon-src/**",
+      "!assets/icon-1024.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Moewki",
+      "uninstallDisplayName": "Moewki"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "assets/icon-1024.png",
+      "category": "public.app-category.entertainment",
+      "extendInfo": {
+        "LSUIElement": true
+      }
+    }
   }
 }

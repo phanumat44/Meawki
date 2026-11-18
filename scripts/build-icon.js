@@ -52,6 +52,8 @@ app.whenReady().then(async () => {
   const tray = fs.readFileSync(path.join(SRC, 'tray-template.svg'), 'utf8');
   fs.writeFileSync(path.join(OUT, 'trayTemplate.png'), await render(win, tray, 18));
   fs.writeFileSync(path.join(OUT, 'trayTemplate@2x.png'), await render(win, tray, 36));
-  console.log(`wrote icon.ico (${SIZES.join(', ')} px), icon.png, icon-32.png, trayTemplate.png (+@2x)`);
+  // the macOS app icon (.icns) is generated from this by electron-builder
+  fs.writeFileSync(path.join(OUT, 'icon-1024.png'), await render(win, svgFor(1024), 1024));
+  console.log(`wrote icon.ico (${SIZES.join(', ')} px), icon.png, icon-32.png, icon-1024.png, trayTemplate.png (+@2x)`);
   app.quit();
 });

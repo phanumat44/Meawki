@@ -7,7 +7,19 @@ npm install
 npm start          # run
 npm run debug      # show ledges + state log + devtools
 npx electron . --settings     # open the settings window on start
+npm test           # unit tests (multi-monitor layout)
 ```
+
+## ทำตัวติดตั้ง
+
+```bash
+npm run dist:win   # Windows: dist/Moewki Setup <version>.exe
+npm run dist:mac   # macOS: dist/Moewki-<version>.dmg (ต้องรันบนเครื่อง Mac)
+```
+
+- ตัวติดตั้งยังไม่ได้เซ็นโค้ด: Windows จะขึ้น SmartScreen "Windows protected your PC" → More info → Run anyway ส่วน macOS ต้องคลิกขวา → Open ครั้งแรก
+- ถ้าจะแจกจริงควรเซ็นโค้ด: Windows ใช้ code signing certificate, macOS ใช้ Apple Developer ID พร้อม notarize
+- ไอคอน macOS (`.icns`) สร้างจาก `assets/icon-1024.png` ตอน build
 
 - **ตั้งค่า**: คลิกไอคอนแมวใน tray (หรือคลิกขวา → Settings…) — เพิ่ม/ลบแมว, เลือกสายพันธุ์, เปิด/ปิดพฤติกรรม, ความเร็ว, ขนาด, ภาษา
 - **ลากแมว**: คลิกค้างแล้วลาก (โยนได้)
@@ -53,6 +65,7 @@ rm -rf node_modules && npm install && npm start
 |---|---|
 | `winapi.js` | Win32 `EnumWindows` + DWM frame bounds via koffi, in z-order |
 | `macapi.js` | macOS `CGWindowListCopyWindowInfo` via koffi, same output shape |
+| `layout.js` | multi-monitor: neighbouring displays, windows per display, which display each cat lives on (tested in `test/`) |
 | `main.js` | click-through always-on-top overlay on the primary display, window polling at ~30 Hz, tray, settings (saved to `%APPDATA%/moewki/settings.json`) |
 | `renderer/brain.js` | window tops → walkable ledges (minus parts covered by windows above); behaviour state machine with postures |
 | `renderer/pose.js` | pose for every behaviour mode (joint angles), blended frame to frame |
@@ -62,3 +75,9 @@ rm -rf node_modules && npm install && npm start
 | `scripts/build-icon.js` | `npm run icon`: renders `assets/icon-src/*.svg` to `icon.ico`, `icon.png` and the macOS `trayTemplate.png` |
 
 Maximized windows (top edge at the screen top) are not ledges, but they still block the windows behind them.
+
+**หลายจอ:** มีหน้าต่างซ้อน (overlay) แยกหนึ่งอันต่อจอ แต่ละอันวาดตาม DPI ของจอตัวเอง แมวแต่ละตัวอยู่จอเดียวในแต่ละช่วงเวลา
+ถ้าเดินหรือถูกโยนออกทางขอบที่มีจออื่นติดอยู่ จะย้ายไปจอนั้นแล้วเดินเข้ามาจากขอบฝั่งตรงข้าม ถ้าถอดจอออก แมวบนจอนั้นจะย้ายมาจอหลัก
+
+**ประหยัดพลังงาน:** วาดเต็ม 60 fps เฉพาะตอนกระโดด/ตก/ถูกลาก/วิ่ง, 30 fps ตอนเดินทั่วไป, 10 fps ตอนแมวทุกตัวพัก และหยุดวาดเลยตอนซ่อน
+อ่านตำแหน่งหน้าต่าง 30 ครั้ง/วินาทีเฉพาะตอนแมวกำลังขยับหรือหน้าต่างกำลังเลื่อน นอกนั้น 5 ครั้ง/วินาที
